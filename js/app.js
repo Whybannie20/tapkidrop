@@ -1,20 +1,66 @@
-// DATA
-const products = [
-  {id:1,brand:'nike',name:'Air Max 97 Silver',price:14990,old:18990,badge:'-21%',size:[40,41,42,43]},
-  {id:2,brand:'adidas',name:'Ultraboost 22',price:12990,old:null,badge:'NEW',size:[39,40,41,42]},
-  {id:3,brand:'newbalance',name:'550 White Green',price:11990,old:13500,badge:'-11%',size:[41,42,43,44]},
-  {id:4,brand:'puma',name:'RS-X Reinvention',price:8990,old:null,badge:null,size:[40,41,42]},
-  {id:5,brand:'local',name:'Street Runner V3',price:4990,old:6500,badge:'SALE',size:[38,39,40,41,42]},
-  {id:6,brand:'nike',name:'Dunk Low Retro',price:13490,old:null,badge:'HOT',size:[39,40,41,42,43]},
-  {id:7,brand:'adidas',name:'Samba OG',price:11490,old:null,badge:null,size:[40,41,42,43,44]},
-  {id:8,brand:'local',name:'Minimal Walker',price:3990,old:4500,badge:'-11%',size:[38,39,40,41]}
-];
-const validPromos = {'TAPKI2026':15,'NEWDROP10':10,'DROPVIP':25,'WELCOME5':5};
+// === FIREBASE CONFIG ===
+const firebaseConfig = {
+  apiKey: "AIzaSyBv1oWzM9P_mCGIDNYpcj5SehNmtOjzaX0",
+  authDomain: "tapkidrop-7550b.firebaseapp.com",
+  projectId: "tapkidrop-7550b",
+  storageBucket: "tapkidrop-7550b.firebasestorage.app",
+  messagingSenderId: "804177130427",
+  appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
+};
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+// === TELEGRAM CONFIG ===
+const TG_BOT_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
+const TG_ADMIN_CHAT_ID = "-1003371505343";
 
 // STATE
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
-let activePromo = localStorage.getItem('promo') || null;
-let auth = JSON.parse(localStorage.getItem('auth')) || null;
+let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
+let purchasedProducts = JSON.parse(localStorage.getItem('purchasedProducts')) || [];
+let currentProductId = null;
+let selectedSize = null;
+let selectedPhotos = [];
+
+// DATA
+const products = [
+  {id:1,brand:'nike',name:'Air Max 97 Silver',price:14990,desc:'Культовая модель с системой амортизации Air. Отличное состояние, полная комплектация.',sizes:[39,40,41,42,43,44]},
+  {id:2,brand:'adidas',name:'Ultraboost 22',price:12990,desc:'Максимальный комфорт для бега и города. Технология Boost возвращает энергию.',sizes:[40,41,42,43]},
+  {id:3,brand:'newbalance',name:'550 White Green',price:11990,desc:'Ретро-баскетбольный силуэт. Тренд сезона. Натуральная кожа.',sizes:[41,42,43,44]},
+  {id:4,brand:'local',name:'Street Runner V3',price:4990,desc:'Локальный бренд. Легкие, дышащие. Идеальны на каждый день.',sizes:[38,39,40,41,42]}
+];
+
+// REVIEWS DATA
+let allReviews = JSON.parse(localStorage.getItem('allReviews')) || {
+  1: [{user:'Alex',name:'Алексей',stars:5,text:'Топ пушки, качество огонь!',date:'10.04.2026',photos:[]}],
+  2: [{user:'Max',name:'Макс',stars:4,text:'Удобные, но маломерят.',date:'09.04.2026',photos:[]}]
+};
+const saveReviews = () => localStorage.setItem('allReviews', JSON.stringify(allReviews));
+
+// USER PROFILES
+let userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+const saveUserProfile = (email, name) => { userProfiles[email] = name; localStorage.setItem('userProfiles', JSON.stringify(userProfiles)); };
+const getUserProfile = (email) => userProfiles[email] || email.split('@')[0];
+
+// RANKS
+const ranks = [
+  { lvl: 0, title: 'Гость', discount: 0, perks: [] },
+  { lvl: 1, title: 'Стритвир-фан', discount: 1, perks: [] },
+  { lvl: 2, title: 'Сникерхед', discount: 2, perks: [] },
+  { lvl: 3, title: 'Дроп-охотник', discount: 3, perks: [] },
+  { lvl: 4, title: 'Уличный стиль', discount: 4, perks: [] },
+  { lvl: 5, title: 'Гуру кроссовок', discount: 5, perks: ['Скидка на аксессуары'] },
+  { lvl: 6, title: 'Коллекционер', discount: 6, perks: ['Скидка на аксессуары', 'Ранний доступ к дропам'] },
+  { lvl: 7, title: 'Трендсеттер', discount: 7, perks: ['Скидка на аксессуары', 'Ранний доступ', 'Приоритетная поддержка'] },
+  { lvl: 8, title: 'Амбассадор', discount: 8, perks: ['Скидка на аксессуары', 'Ранний доступ', 'Приоритетная поддержка', 'Бесплатная упаковка'] },
+  { lvl: 9, title: 'VIP-покупатель', discount: 9, perks: ['Скидка на аксессуары', 'Ранний доступ', 'Приоритетная поддержка', 'Бесплатная упаковка', 'Персональный менеджер'] },
+  { lvl: 10, title: 'Легенда', discount: 10, perks: ['Максимальная скидка 10%', 'Бесплатная доставка всегда', 'Эксклюзивные дропы', 'Личный менеджер', 'Гарантия возврата 30 дней'] }
+];
+function getRankData(count) {
+  const lvl = Math.min(count, 10);
+  const data = ranks[lvl];
+  return { lvl: count > 10 ? 10 : lvl, displayLvl: count, title: count > 10 ? 'Император' : data.title, discount: data.discount, perks: count > 10 ? [...data.perks, 'Эксклюзивные коллаборации'] : data.perks, isMax: count >= 10 };
+}
 
 // NAV
 window.navigate = target => {
@@ -23,179 +69,210 @@ window.navigate = target => {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelector(`.nav-item[data-target="${target}"]`)?.classList.add('active');
   window.scrollTo({top:0,behavior:'smooth'});
+  if(target === 'admin') renderAdmin();
 };
 document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => navigate(b.dataset.target));
-document.querySelector('.logo').onclick = () => navigate('home');
 
 // CATALOG
-const renderProducts = (list) => {
-  const grid = document.getElementById('catalog-grid');
-  if(!list.length){ grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><i class="fa-solid fa-filter"></i><p>Ничего не найдено. Попробуйте изменить фильтры.</p></div>`; return; }
-  grid.innerHTML = list.map(p => `
-    <div class="product-card">
-      <div class="prod-img">👟${p.badge?`<span class="prod-badge">${p.badge}</span>`:''}</div>
-      <div class="prod-info">
-        <div class="prod-brand">${p.brand}</div>
-        <div class="prod-name">${p.name}</div>
-        <div class="prod-price">${p.price.toLocaleString('ru')} ₽ ${p.old?`<span class="old">${p.old.toLocaleString('ru')} ₽</span>`:''}</div>
-        <div class="prod-actions">
-          <button class="btn-cart" onclick="addToCart(${p.id})">В корзину</button>
-          <button class="btn-fav" onclick="this.style.color='var(--danger)'"><i class="fa-regular fa-heart"></i></button>
-        </div>
-      </div>
+const renderProducts = () => {
+  document.getElementById('catalog-grid').innerHTML = products.map(p => `
+    <div class="product-card" onclick="openProduct(${p.id})">
+      <div class="prod-img">👟</div>
+      <div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-price">${p.price.toLocaleString('ru')} ₽</div>
+      <div class="prod-actions"><button class="btn-cart">Подробнее</button></div></div>
     </div>`).join('');
 };
-renderProducts(products);
+renderProducts();
 
-// FILTERS
-let currentFilter = 'all';
-document.querySelectorAll('.cat-btn').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.cat-btn').forEach(x => x.classList.remove('active'));
-  b.classList.add('active'); currentFilter = b.dataset.cat; applyFilters();
+// PRODUCT DETAIL
+window.openProduct = id => {
+  currentProductId = id; selectedSize = null;
+  const p = products.find(x => x.id === id); if(!p) return;
+  document.getElementById('detail-brand').textContent = p.brand;
+  document.getElementById('detail-name').textContent = p.name;
+  document.getElementById('detail-price').textContent = p.price.toLocaleString('ru') + ' ₽';
+  document.getElementById('detail-desc').textContent = p.desc;
+  document.getElementById('sizes-container').innerHTML = p.sizes.map(s => `<button class="size-btn" onclick="selectSize(this, ${s})">${s}</button>`).join('');
+  const prodReviews = allReviews[id] || [];
+  const avg = prodReviews.length ? (prodReviews.reduce((a,b)=>a+b.stars,0)/prodReviews.length).toFixed(1) : '0.0';
+  document.getElementById('detail-rating').textContent = `⭐ ${avg} (${prodReviews.length})`;
+  renderReviews(id); checkReviewAvailability(id); navigate('product');
+};
+window.selectSize = (btn, size) => {
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); selectedSize = size;
+};
+window.addToCartFromDetail = () => {
+  if(!selectedSize){alert('Выберите размер!');return;}
+  const p = products.find(x => x.id === currentProductId);
+  cart.push({...p, size: selectedSize});
+  localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI();
+  alert(`Добавлено: ${p.name} (${selectedSize})`);
+};
+
+// REVIEW AVAILABILITY
+function checkReviewAvailability(productId) {
+  const box = document.getElementById('review-box'), msg = document.getElementById('no-review-msg');
+  if(!auth.currentUser) { box.style.display='none'; msg.innerHTML='<p>💡 <a href="#" onclick="navigate(\'profile\')" style="color:var(--primary)">Войдите</a> для отзыва</p>'; msg.style.display='block'; return; }
+  const has = purchasedProducts.some(p => p.id === productId && p.user === auth.currentUser.email);
+  const done = (allReviews[productId]||[]).some(r => r.user === auth.currentUser.email);
+  if(has && !done) { box.style.display='block'; msg.style.display='none'; }
+  else if(done) { box.style.display='none'; msg.innerHTML='<p>✅ Вы уже оставляли отзыв</p>'; msg.style.display='block'; }
+  else { box.style.display='none'; msg.innerHTML='<p>💡 Купите товар, чтобы оставить отзыв</p>'; msg.style.display='block'; }
+}
+
+// REVIEWS RENDER
+function renderReviews(id) {
+  const list = document.getElementById('reviews-list');
+  const revs = allReviews[id] || [];
+  list.innerHTML = revs.length ? revs.map(r => `
+    <div class="review-card">
+      <div class="reviewer-avatar">👤</div>
+      <div class="review-content">
+        <h5><span class="reviewer-name">${r.name||r.user}</span><span class="review-date">${r.date}</span></h5>
+        <div class="review-stars">${'⭐'.repeat(r.stars)}</div>
+        <p class="review-text">${r.text}</p>
+        ${r.photos?.length ? `<div class="review-photos">${r.photos.map(img=>`<img src="${img}" class="review-photo" onclick="window.open(this.src)">`).join('')}</div>` : ''}
+      </div>
+    </div>`).join('') : '<p style="color:var(--text-muted)">Отзывов пока нет.</p>';
+}
+
+// SUBMIT REVIEW
+window.submitReview = () => {
+  const txt = document.getElementById('review-text').value.trim();
+  const stars = document.querySelector('.stars-input .active')?.dataset.val || 5;
+  if(!txt){alert('Напишите текст');return;}
+  if(!auth.currentUser){alert('Войдите в аккаунт');return;}
+  const rev = {user:auth.currentUser.email, name:getUserProfile(auth.currentUser.email), stars:parseInt(stars), text:txt, date:new Date().toLocaleDateString('ru'), photos:selectedPhotos};
+  if(!allReviews[currentProductId]) allReviews[currentProductId]=[];
+  allReviews[currentProductId].unshift(rev); saveReviews();
+  document.getElementById('review-text').value=''; document.querySelectorAll('.stars-input i').forEach(i=>i.classList.remove('active'));
+  selectedPhotos=[]; document.getElementById('photo-preview').innerHTML='';
+  renderReviews(currentProductId); checkReviewAvailability(currentProductId); alert('✅ Отзыв опубликован!');
+};
+
+// PHOTO UPLOAD
+document.getElementById('review-photo')?.addEventListener('change', e => {
+  selectedPhotos=[]; const prev=document.getElementById('photo-preview'); prev.innerHTML='';
+  Array.from(e.target.files).forEach(f => {
+    if(f.type.startsWith('image/')){
+      const r=new FileReader(); r.onload=ev=>{selectedPhotos.push(ev.target.result); prev.innerHTML+=`<img src="${ev.target.result}" class="preview-img">`;}; r.readAsDataURL(f);
+    }
+  });
 });
-window.filterByBrand = brand => {
-  navigate('catalog'); currentFilter = brand; applyFilters();
-};
-const applyFilters = () => {
-  let res = products;
-  if(currentFilter !== 'all') res = res.filter(p => p.brand === currentFilter);
-  const from = +document.getElementById('price-from').value;
-  const to = +document.getElementById('price-to').value;
-  if(from) res = res.filter(p => p.price >= from);
-  if(to) res = res.filter(p => p.price <= to);
-  renderProducts(res);
-};
-document.getElementById('price-from').oninput = applyFilters;
-document.getElementById('price-to').oninput = applyFilters;
-window.resetFilters = () => {
-  document.getElementById('price-from').value=''; document.getElementById('price-to').value=''; currentFilter='all';
-  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelector('.cat-btn[data-cat="all"]').classList.add('active'); renderProducts(products);
-};
 
-// SORT
-document.querySelectorAll('.sort-btn').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.sort-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
-  let sorted = [...products];
-  const s = b.dataset.sort;
-  if(s==='price-asc') sorted.sort((a,b)=>a.price-b.price);
-  if(s==='price-desc') sorted.sort((a,b)=>b.price-a.price);
-  if(s==='new') sorted.sort((a,b)=>b.id-a.id);
-  renderProducts(sorted);
-});
-
-// CART
-window.addToCart = id => {
-  const p = products.find(x=>x.id===id);
-  const exist = cart.find(x=>x.id===id);
-  if(exist) exist.qty++; else cart.push({...p, qty:1});
-  saveCart(); updateCartUI();
-};
-window.addToCartFromWeek = () => { cart.push({...products[0], qty:1}); saveCart(); updateCartUI(); navigate('cart'); alert('🔥 Air Max 97 добавлен в корзину!'); };
-window.changeQty = (id,d) => {
-  const i = cart.find(x=>x.id===id);
-  if(i){ i.qty+=d; if(i.qty<1) cart=cart.filter(x=>x.id!==id); }
-  saveCart(); updateCartUI();
-};
-const saveCart = () => localStorage.setItem('cart', JSON.stringify(cart));
+// CART UI
 const updateCartUI = () => {
-  document.getElementById('cart-badge').textContent = cart.reduce((s,i)=>s+i.qty,0);
-  document.getElementById('cart-count-summary').textContent = cart.reduce((s,i)=>s+i.qty,0);
-  const empty = document.getElementById('cart-empty');
-  const items = document.getElementById('cart-items');
-  const footer = document.querySelector('.cart-summary-section');
-  if(!cart.length){ empty.style.display='block'; items.style.display='none'; footer.style.display='none'; return; }
-  empty.style.display='none'; items.style.display='block'; footer.style.display='block';
-  items.innerHTML = cart.map(i => `
-    <div class="cart-item">
-      <div class="cart-item-img">👟</div>
-      <div class="cart-item-info">
-        <h4>${i.name}</h4>
-        <div class="cart-item-meta">${i.brand} • Размер ${i.size[1] || 42}</div>
-        <div class="cart-controls">
-          <button class="qty-btn" onclick="changeQty(${i.id},-1)">-</button>
-          <span>${i.qty}</span>
-          <button class="qty-btn" onclick="changeQty(${i.id},1)">+</button>
-          <button onclick="removeItem(${i.id})" style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.85rem"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </div>
-    </div>`).join('');
-  const sub = cart.reduce((s,i)=>s+i.price*i.qty,0);
-  const disc = activePromo && validPromos[activePromo] ? Math.floor(sub * validPromos[activePromo]/100) : 0;
-  document.getElementById('cart-subtotal').textContent = sub.toLocaleString('ru') + ' ₽';
-  document.getElementById('cart-total').textContent = (sub-disc).toLocaleString('ru') + ' ₽';
-  document.getElementById('discount-row').style.display = disc ? 'flex' : 'none';
-  document.getElementById('discount-value').textContent = '-' + disc.toLocaleString('ru') + ' ₽';
-  const msg = document.getElementById('promo-message');
-  msg.innerHTML = activePromo ? `<span style="color:var(--success)">✅ ${activePromo} (-${validPromos[activePromo]}%)</span>` : '';
+  const rank = getRankData(orderCount);
+  document.getElementById('cart-badge').textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
+  const empty=document.getElementById('cart-empty'), items=document.getElementById('cart-items'), footer=document.querySelector('.cart-summary-section');
+  if(!cart.length){empty.style.display='block';items.style.display='none';footer.style.display='none';return;}
+  empty.style.display='none';items.style.display='block';footer.style.display='block';
+  items.innerHTML = cart.map((i,idx)=>`<div class="cart-item"><div class="cart-item-img">👟</div><div class="cart-item-info"><div style="font-weight:600">${i.name} (${i.size||'?'})</div><div style="font-size:0.85rem;color:var(--text-muted)">${i.price.toLocaleString('ru')} ₽</div></div><button onclick="removeItem(${idx})" style="background:none;border:none;color:var(--danger);cursor:pointer">🗑</button></div>`).join('');
+  const sub=cart.reduce((s,i)=>s+i.price*(i.qty||1),0);
+  const disc=Math.floor(sub*(rank.discount/100));
+  document.getElementById('cart-subtotal').textContent=sub.toLocaleString('ru')+' ₽';
+  document.getElementById('discount-row').style.display=disc>0?'flex':'none';
+  document.getElementById('discount-lvl').textContent=rank.discount;
+  document.getElementById('discount-amount').textContent='-'+disc.toLocaleString('ru')+' ₽';
+  document.getElementById('cart-total').textContent=(sub-disc).toLocaleString('ru')+' ₽';
 };
-window.removeItem = id => { cart=cart.filter(x=>x.id!==id); saveCart(); updateCartUI(); };
-window.applyPromo = () => {
-  const code = document.getElementById('promo-input').value.toUpperCase().trim();
-  if(validPromos[code]){ activePromo=code; localStorage.setItem('promo',code); updateCartUI(); }
-  else { document.getElementById('promo-message').innerHTML='<span style="color:var(--danger)">❌ Неверный код</span>'; setTimeout(()=>document.getElementById('promo-message').innerHTML='',2000); }
-};
-window.checkout = () => {
-  if(!auth){ navigate('profile'); alert('Пожалуйста, войдите в аккаунт для оформления.'); return; }
-  alert(`✅ Заказ на сумму ${document.getElementById('cart-total').textContent} успешно создан!\nОжидайте СМС с подтверждением.`);
-  cart=[]; saveCart(); updateCartUI();
-  const orders = JSON.parse(localStorage.getItem('orders')||'[]');
-  orders.push({id:Math.floor(Math.random()*900000+100000),date:new Date().toLocaleDateString('ru'),total:document.getElementById('cart-total').textContent,status:'В обработке'});
-  localStorage.setItem('orders',JSON.stringify(orders)); renderOrders();
+window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
+
+// TELEGRAM NOTIFICATION
+function sendTelegram(orderData) {
+  if(!TG_BOT_TOKEN || !TG_ADMIN_CHAT_ID) return;
+  const text = `📦 <b>НОВЫЙ ЗАКАЗ!</b>\n👤 Клиент: ${orderData.user}\n🛍️ Товары: ${orderData.items}\n💰 Сумма: <b>${orderData.total} ₽</b>\n📅 ${new Date().toLocaleString('ru')}`;
+  fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({chat_id:TG_ADMIN_CHAT_ID, text, parse_mode:'HTML'})
+  }).catch(e=>console.warn('TG Err:',e));
+}
+
+// CHECKOUT
+window.checkout = () => { 
+  if(!auth.currentUser){navigate('profile');alert('Войдите в аккаунт');return;} 
+  if(!cart.length) return;
+  
+  const itemsList = cart.map(i=>`${i.name} (${i.size||''})`).join(', ');
+  const sub = cart.reduce((s,i)=>s+i.price*(i.qty||1),0);
+  const order = {id:Date.now(), user:auth.currentUser.email, items:itemsList, total:sub.toLocaleString('ru'), status:'Новый', date:new Date().toISOString()};
+  
+  let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+  allOrders.push(order); localStorage.setItem('allOrders', JSON.stringify(allOrders));
+  
+  cart.forEach(item => { if(!purchasedProducts.some(p=>p.id===item.id && p.user===auth.currentUser.email)) purchasedProducts.push({id:item.id, user:auth.currentUser.email, date:new Date().toISOString()}); });
+  localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
+  
+  sendTelegram(order);
+  
+  orderCount++; localStorage.setItem('orderCount', orderCount);
+  const nr=getRankData(orderCount), pr=getRankData(orderCount-1);
+  if(nr.lvl>pr.lvl) showToast(`LVL ${nr.displayLvl}`, nr.title);
+  alert('✅ Заказ оформлен! Ожидайте сообщения.');
+  cart=[]; localStorage.setItem('cart','[]'); updateCartUI(); updateProfileUI();
 };
 
-// ORDERS
-const renderOrders = () => {
-  const list = document.getElementById('orders-list');
-  const data = JSON.parse(localStorage.getItem('orders')||'[]');
-  if(!data.length){ list.innerHTML=`<div class="empty-state"><i class="fa-solid fa-box-open"></i><p>Пока нет заказов</p></div>`; return; }
-  list.innerHTML = data.map(o => `
-    <div class="order-card">
-      <div class="order-header"><span>№${o.id} от ${o.date}</span><span class="order-status status-${o.status==='Готов'? 'done':'pending'}">${o.status}</span></div>
-      <div style="font-weight:600;margin-bottom:4px">Сумма: ${o.total}</div>
-      <div class="order-items"><div class="order-thumb">👟</div><div class="order-thumb">👟</div></div>
-    </div>`).join('');
+function showToast(t,d){const el=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=d;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
+
+// PROFILE & ADMIN
+window.saveUsername = () => { const n=document.getElementById('username-input').value.trim(); if(!n||!auth.currentUser)return alert('Введите имя'); saveUserProfile(auth.currentUser.email,n); updateProfileUI(); document.getElementById('settings-card').style.display='none'; alert('✅ Сохранено'); };
+const updateProfileUI = () => {
+  const rank=getRankData(orderCount), name=auth.currentUser?getUserProfile(auth.currentUser.email):'Гость';
+  document.getElementById('profile-display-name').textContent=name;
+  document.getElementById('user-lvl').textContent=rank.displayLvl; document.getElementById('user-title').textContent=rank.title; document.getElementById('user-discount').textContent=rank.discount;
+  document.getElementById('lvl-progress').style.width=(rank.isMax?100:((rank.displayLvl%10)/10)*100)+'%';
+  document.getElementById('progress-text').textContent=rank.isMax?'🏆 Максимум!':`До след. уровня: ${10-rank.displayLvl} заказов`;
+  document.getElementById('perks-grid').innerHTML=rank.perks.length?rank.perks.map(p=>`<div class="perk-card"><div class="perk-icon"><i class="fa-solid fa-check"></i></div><div class="perk-info"><div class="perk-name">${p}</div></div></div>`).join(''):'<p style="color:var(--text-muted);font-size:0.85rem">Совершите первый заказ</p>';
+  document.getElementById('stat-orders').textContent=orderCount; document.getElementById('stat-bonus').textContent=orderCount*50;
+  if(auth.currentUser) document.getElementById('username-input').value=name;
 };
 
-// AUTH & PROFILE
-const renderProfile = () => {
-  if(auth){
-    document.getElementById('auth-view').style.display='none';
-    document.getElementById('profile-view').style.display='block';
-    document.getElementById('profile-name').textContent = 'Пользователь';
-    document.getElementById('profile-email').textContent = auth.email;
+function renderAdmin() {
+  if(!auth.currentUser) return;
+  // Простая проверка админа (замени на свою почту при деплое)
+  const isAdmin = auth.currentUser.email === 'maslakov.antoni@yandex.ru';
+  if(!isAdmin) return; 
+  const list=document.getElementById('orders-list-admin');
+  const all=JSON.parse(localStorage.getItem('allOrders'))||[];
+  list.innerHTML=all.length?all.reverse().map(o=>`<div class="order-row"><div class="order-info"><div class="order-id">#${String(o.id).slice(-4)}</div><div>${o.user}</div><div style="font-size:0.8rem;color:var(--text-muted)">${o.items}</div></div><div style="text-align:right"><div class="order-sum">${o.total} ₽</div><span class="status-badge">${o.status}</span></div></div>`).join(''):'<p class="muted">Заказов нет</p>';
+}
+window.clearAllOrders=()=>{if(confirm('Удалить историю?')){localStorage.removeItem('allOrders');renderAdmin();}};
+window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р`).join('\n'));alert('Скопировано!');};
+
+// AUTH
+const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
+let isLogin=true;
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');isLogin=t.dataset.tab==='login';authSub.textContent=isLogin?'Войти':'Создать аккаунт';authErr.style.display='none';});
+authForm.onsubmit=async e=>{e.preventDefault();const em=emailIn.value.trim(),pw=passIn.value;authErr.style.display='none';authSub.disabled=true;authSub.textContent='...';try{isLogin?await auth.signInWithEmailAndPassword(em,pw):await auth.createUserWithEmailAndPassword(em,pw);}catch(err){authErr.textContent=err.message.replace('Firebase: ','');authErr.style.display='block';}finally{authSub.disabled=false;authSub.textContent=isLogin?'Войти':'Создать аккаунт';}};
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    document.getElementById('auth-flow').style.display='none';
+    document.getElementById('profile-actions').style.display='flex';
+    document.getElementById('settings-card').style.display='block';
+    document.getElementById('profile-email').textContent=user.email;
+    if(user.email==='maslakov.antoni@yandex.ru' && !document.getElementById('admin-link')){
+      document.querySelector('.menu-grid').innerHTML+=`<div class="menu-card-v2" id="admin-link" onclick="navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админ-панель</span><i class="fa-solid fa-chevron-right"></i></div>`;
+    }
+    renderAdmin();
   } else {
-    document.getElementById('auth-view').style.display='block';
-    document.getElementById('profile-view').style.display='none';
-    document.getElementById('profile-name').textContent = 'Гость';
-    document.getElementById('profile-email').textContent = 'Войдите в аккаунт';
+    document.getElementById('auth-flow').style.display='block';
+    document.getElementById('profile-actions').style.display='none';
+    document.getElementById('settings-card').style.display='none';
+    document.getElementById('profile-display-name').textContent='Гость';
+    document.getElementById('profile-email').textContent='Войдите';
+    document.getElementById('admin-link')?.remove();
   }
-};
-document.querySelectorAll('.tab[data-tab]').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); b.classList.add('active');
-  document.querySelector('.auth-phone').style.display = b.dataset.tab==='register'?'block':'none';
-  document.getElementById('auth-submit').textContent = b.dataset.tab==='login'?'Войти':'Создать аккаунт';
+  updateProfileUI();
 });
-document.getElementById('auth-form').onsubmit = e => {
-  e.preventDefault();
-  const email = document.querySelector('#auth-form input[type="email"]').value;
-  auth = {email, id:Math.floor(Math.random()*900000+100000)};
-  localStorage.setItem('auth', JSON.stringify(auth)); renderProfile(); alert('👤 Вы успешно вошли!');
-};
-document.getElementById('logout-btn').onclick = () => { localStorage.removeItem('auth'); auth=null; renderProfile(); };
+document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
-// COUNTDOWN
-const end = new Date(); end.setDate(end.getDate()+3); end.setHours(23,59,59);
-const tick = () => {
-  const diff = end - new Date(); if(diff<=0) return;
-  const d=Math.floor(diff/864e5),h=Math.floor((diff%864e5)/36e5),m=Math.floor((diff%36e5)/6e4),s=Math.floor((diff%6e4)/1e3);
-  document.getElementById('countdown').innerHTML=`<span>${d}д</span>:<span>${h}ч</span>:<span>${m}м</span>:<span>${s}с</span>`;
-};
-tick(); setInterval(tick,1000);
+// CHAT
+window.openSupportChat=()=>document.getElementById('support-modal').style.display='flex';
+window.closeSupportChat=()=>document.getElementById('support-modal').style.display='none';
+window.sendChatMessage=()=>{const i=document.getElementById('chat-input'),t=i.value.trim();if(!t)return;const b=document.getElementById('chat-messages');b.innerHTML+=`<div class="chat-msg user"><div class="msg-bubble">${t}</div></div>`;i.value='';b.scrollTop=b.scrollHeight;setTimeout(()=>{b.innerHTML+=`<div class="chat-msg bot"><div class="msg-bubble">Оператор ответит через 5 мин. ⏳</div></div>`;b.scrollTop=b.scrollHeight;},1000);};
 
-// SCROLL ANIMATION
-const obs = new IntersectionObserver(e=>e.forEach(x=>x.isIntersecting&&x.target.classList.add('visible')),{threshold:0.1});
-document.querySelectorAll('.fade-in').forEach(el=>obs.observe(el));
+document.querySelectorAll('.stars-input i').forEach(s=>s.onclick=function(){document.querySelectorAll('.stars-input i').forEach(x=>x.classList.remove('active'));this.classList.add('active');let v=parseInt(this.dataset.val);for(let k=0;k<v;k++)document.querySelectorAll('.stars-input i')[k].classList.add('active');});
 
-// INIT
-updateCartUI(); renderProfile(); renderOrders();
+updateCartUI(); updateProfileUI();
