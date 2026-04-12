@@ -64,10 +64,18 @@ function getRankData(count) {
 
 // NAV
 window.navigate = target => {
+  // Принудительно скрываем все страницы
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(target).classList.add('active');
+  // Показываем нужную
+  const targetEl = document.getElementById(target);
+  if(targetEl) targetEl.classList.add('active');
+  
+  // Обновляем навигацию
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.querySelector(`.nav-item[data-target="${target}"]`)?.classList.add('active');
+  const activeBtn = document.querySelector(`.nav-item[data-target="${target}"]`);
+  if(activeBtn) activeBtn.classList.add('active');
+  
+  // Скролл наверх (фикс бага)
   window.scrollTo({top:0,behavior:'smooth'});
   if(target === 'admin') renderAdmin();
 };
@@ -244,7 +252,6 @@ authForm.onsubmit=async e=>{
     if(isLogin) await auth.signInWithEmailAndPassword(em,pw);
     else await auth.createUserWithEmailAndPassword(em,pw);
   } catch(err) {
-    // Перевод ошибок Firebase
     const msgs = {
       'auth/user-not-found':'Пользователь не найден. Проверьте email.',
       'auth/wrong-password':'Неверный пароль.',
@@ -276,7 +283,6 @@ auth.onAuthStateChanged(user=>{
     document.getElementById('profile-display-name').textContent='Гость';
     document.getElementById('profile-email').textContent='Войдите';
     document.getElementById('admin-link')?.remove();
-    // Сбрасываем форму входа при логауте
     emailIn.value=''; passIn.value=''; isLogin=true;
     document.querySelector('.tab[data-tab="login"]').click();
   }
