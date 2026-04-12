@@ -4,14 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ТапкиДроп | Премиум маркетплейс</title>
-  <!-- PWA META -->
   <meta name="theme-color" content="#0b0c10">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ТапкиДроп">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -36,27 +34,39 @@
   </nav>
 
   <main>
-    <section id="home" class="page active">
-      <div class="hero container">
-        <div class="hero__inner fade-in">
-          <div class="hero__text">
-            <span class="badge-hero">DROP #04 / 2026</span>
-            <h1>Стиль без компромиссов</h1>
-            <p>Проверенные пары. Доставка за 24 часа.</p>
-            <div class="hero__actions">
-              <button class="btn btn--primary" onclick="navigate('catalog')">Каталог</button>
-              <button class="btn btn--glass"><i class="fa-solid fa-shield-halved"></i> Гарантия</button>
-            </div>
+    <!-- HERO -->
+    <section id="home" class="page active hero-page">
+      <div class="hero-bg"></div>
+      <div class="container hero-container">
+        <div class="hero-content">
+          <div class="hero-badge animate-up">🔥 DROP #04 / 2026</div>
+          <h1 class="hero-title animate-up" style="animation-delay:0.1s">Стиль<br><span class="gradient-text">без компромиссов</span></h1>
+          <p class="hero-subtitle animate-up" style="animation-delay:0.2s">Премиум кроссовки. Проверка подлинности. Доставка за 24 часа.</p>
+          <div class="hero-actions animate-up" style="animation-delay:0.3s">
+            <button class="btn btn--primary btn--lg" onclick="navigate('catalog')"><i class="fa-solid fa-bag-shopping"></i> Открыть каталог</button>
+            <button class="btn btn--glass btn--lg" onclick="navigate('profile')"><i class="fa-solid fa-crown"></i> Мой аккаунт</button>
           </div>
-          <div class="hero__visual"><div class="glow"></div><div class="sneaker-shadow">👟</div></div>
+          <div class="hero-stats animate-up" style="animation-delay:0.4s">
+            <div class="stat-item"><span class="stat-num" data-target="1500">0</span><span class="stat-label">Продано пар</span></div>
+            <div class="stat-item"><span class="stat-num" data-target="98">0</span><span class="stat-label">% довольных</span></div>
+            <div class="stat-item"><span class="stat-num" data-target="24">0</span><span class="stat-label">часа доставка</span></div>
+          </div>
+        </div>
+        <div class="hero-visual animate-up" style="animation-delay:0.2s">
+          <div class="glow-orb"></div>
+          <div class="sneaker-float" id="hero-sneaker">👟</div>
+          <div class="floating-badge badge-1">✅ Оригинал</div>
+          <div class="floating-badge badge-2">🚀 Fast Ship</div>
         </div>
       </div>
     </section>
 
+    <!-- CATALOG -->
     <section id="catalog" class="page container">
       <div class="grid" id="catalog-grid"></div>
     </section>
 
+    <!-- PRODUCT -->
     <section id="product" class="page container">
       <button class="back-btn" onclick="navigate('catalog')"><i class="fa-solid fa-arrow-left"></i> Назад в каталог</button>
       <div class="product-layout">
@@ -74,7 +84,6 @@
           <button class="btn btn--primary btn-large add-cart-btn" onclick="addToCartFromDetail()">Добавить в корзину</button>
         </div>
       </div>
-
       <div class="reviews-section">
         <h3 class="section-title">Отзывы покупателей</h3>
         <div class="reviews-list" id="reviews-list"></div>
@@ -94,6 +103,7 @@
       </div>
     </section>
 
+    <!-- CART -->
     <section id="cart" class="page cart-page">
       <div class="container">
         <h1 class="page-title"><i class="fa-solid fa-bag-shopping"></i> Корзина</h1>
@@ -112,6 +122,7 @@
       </div>
     </section>
 
+    <!-- PROFILE -->
     <section id="profile" class="page profile-page">
       <div class="profile-banner">
         <div class="banner-pattern"></div>
@@ -155,7 +166,10 @@
         <div id="auth-flow">
           <div class="auth-card-v2">
             <div class="auth-header"><div class="auth-logo">👟</div><h3>Добро пожаловать!</h3><p>Войдите для доступа к бонусам</p></div>
-            <div class="tabs"><button class="tab active" data-tab="login">Вход</button><button class="tab" data-tab="register">Регистрация</button></div>
+            <div class="tabs">
+              <button class="tab active" data-tab="login">Вход</button>
+              <button class="tab" data-tab="register">Регистрация</button>
+            </div>
             <form id="auth-form">
               <div class="input-group"><i class="fa-regular fa-envelope"></i><input type="email" id="email-input" placeholder="Email" class="input" required></div>
               <div class="input-group"><i class="fa-solid fa-lock"></i><input type="password" id="pass-input" placeholder="Пароль" class="input" required></div>
@@ -201,8 +215,6 @@
   </div>
 
   <div id="level-toast" class="level-toast"><div class="toast-icon">🚀</div><div class="toast-content"><div class="toast-title">Новый уровень!</div><div class="toast-desc" id="toast-desc"></div></div></div>
-
-  <!-- PWA INSTALL BUTTON -->
   <button id="install-btn" style="display:none;position:fixed;bottom:90px;right:20px;background:var(--primary);color:#fff;border:none;border-radius:50%;width:56px;height:56px;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 12px rgba(99,102,241,0.4);z-index:99" onclick="installApp()">📲</button>
 
   <script src="js/app.js"></script>

@@ -9,6 +9,8 @@ const firebaseConfig = {
 };
 if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+// 🔒 Фикс: сохраняем сессию даже после закрытия браузера/PWA
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
 // === TELEGRAM CONFIG ===
 const TG_BOT_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
@@ -30,14 +32,12 @@ const products = [
   {id:4,brand:'local',name:'Street Runner V3',price:4990,desc:'Локальный бренд. Легкие, дышащие. Идеальны на каждый день.',sizes:[38,39,40,41,42]}
 ];
 
-// REVIEWS DATA
+// REVIEWS & PROFILES
 let allReviews = JSON.parse(localStorage.getItem('allReviews')) || {
   1: [{user:'Alex',name:'Алексей',stars:5,text:'Топ пушки, качество огонь!',date:'10.04.2026',photos:[]}],
   2: [{user:'Max',name:'Макс',stars:4,text:'Удобные, но маломерят.',date:'09.04.2026',photos:[]}]
 };
 const saveReviews = () => localStorage.setItem('allReviews', JSON.stringify(allReviews));
-
-// USER PROFILES
 let userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
 const saveUserProfile = (email, name) => { userProfiles[email] = name; localStorage.setItem('userProfiles', JSON.stringify(userProfiles)); };
 const getUserProfile = (email) => userProfiles[email] || email.split('@')[0];
@@ -120,8 +120,6 @@ function checkReviewAvailability(productId) {
   else if(done) { box.style.display='none'; msg.innerHTML='<p>✅ Вы уже оставляли отзыв</p>'; msg.style.display='block'; }
   else { box.style.display='none'; msg.innerHTML='<p>💡 Купите товар, чтобы оставить отзыв</p>'; msg.style.display='block'; }
 }
-
-// REVIEWS RENDER
 function renderReviews(id) {
   const list = document.getElementById('reviews-list');
   const revs = allReviews[id] || [];
@@ -136,8 +134,6 @@ function renderReviews(id) {
       </div>
     </div>`).join('') : '<p style="color:var(--text-muted)">Отзывов пока нет.</p>';
 }
-
-// SUBMIT REVIEW
 window.submitReview = () => {
   const txt = document.getElementById('review-text').value.trim();
   const stars = document.querySelector('.stars-input .active')?.dataset.val || 5;
@@ -150,8 +146,6 @@ window.submitReview = () => {
   selectedPhotos=[]; document.getElementById('photo-preview').innerHTML='';
   renderReviews(currentProductId); checkReviewAvailability(currentProductId); alert('✅ Отзыв опубликован!');
 };
-
-// PHOTO UPLOAD
 document.getElementById('review-photo')?.addEventListener('change', e => {
   selectedPhotos=[]; const prev=document.getElementById('photo-preview'); prev.innerHTML='';
   Array.from(e.target.files).forEach(f => {
@@ -232,11 +226,38 @@ function renderAdmin() {
 window.clearAllOrders=()=>{if(confirm('Удалить историю?')){localStorage.removeItem('allOrders');renderAdmin();}};
 window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р`).join('\n'));alert('Скопировано!');};
 
-// AUTH
+// AUTH (FIXED)
 const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
 let isLogin=true;
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');isLogin=t.dataset.tab==='login';authSub.textContent=isLogin?'Войти':'Создать аккаунт';authErr.style.display='none';});
-authForm.onsubmit=async e=>{e.preventDefault();const em=emailIn.value.trim(),pw=passIn.value;authErr.style.display='none';authSub.disabled=true;authSub.textContent='...';try{isLogin?await auth.signInWithEmailAndPassword(em,pw):await auth.createUserWithEmailAndPassword(em,pw);}catch(err){authErr.textContent=err.message.replace('Firebase: ','');authErr.style.display='block';}finally{authSub.disabled=false;authSub.textContent=isLogin?'Войти':'Создать аккаунт';}};
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  isLogin = t.dataset.tab==='login';
+  authSub.textContent = isLogin ? 'Войти' : 'Создать аккаунт';
+  authErr.style.display='none';
+});
+authForm.onsubmit=async e=>{
+  e.preventDefault();
+  const em=emailIn.value.trim(), pw=passIn.value;
+  authErr.style.display='none'; authSub.disabled=true; authSub.textContent='Загрузка...';
+  try {
+    if(isLogin) await auth.signInWithEmailAndPassword(em,pw);
+    else await auth.createUserWithEmailAndPassword(em,pw);
+  } catch(err) {
+    // Перевод ошибок Firebase
+    const msgs = {
+      'auth/user-not-found':'Пользователь не найден. Проверьте email.',
+      'auth/wrong-password':'Неверный пароль.',
+      'auth/email-already-in-use':'Этот email уже зарегистрирован. Нажмите "Вход".',
+      'auth/invalid-email':'Некорректный формат email.',
+      'auth/weak-password':'Пароль должен содержать минимум 6 символов.'
+    };
+    authErr.textContent = msgs[err.code] || err.message.replace('Firebase: ','');
+    authErr.style.display='block';
+  } finally {
+    authSub.disabled=false; authSub.textContent=isLogin?'Войти':'Создать аккаунт';
+  }
+};
 
 auth.onAuthStateChanged(user=>{
   if(user){
@@ -255,6 +276,9 @@ auth.onAuthStateChanged(user=>{
     document.getElementById('profile-display-name').textContent='Гость';
     document.getElementById('profile-email').textContent='Войдите';
     document.getElementById('admin-link')?.remove();
+    // Сбрасываем форму входа при логауте
+    emailIn.value=''; passIn.value=''; isLogin=true;
+    document.querySelector('.tab[data-tab="login"]').click();
   }
   updateProfileUI();
 });
@@ -264,7 +288,6 @@ document.getElementById('logout-btn').onclick=()=>auth.signOut();
 window.openSupportChat=()=>document.getElementById('support-modal').style.display='flex';
 window.closeSupportChat=()=>document.getElementById('support-modal').style.display='none';
 window.sendChatMessage=()=>{const i=document.getElementById('chat-input'),t=i.value.trim();if(!t)return;const b=document.getElementById('chat-messages');b.innerHTML+=`<div class="chat-msg user"><div class="msg-bubble">${t}</div></div>`;i.value='';b.scrollTop=b.scrollHeight;setTimeout(()=>{b.innerHTML+=`<div class="chat-msg bot"><div class="msg-bubble">Оператор ответит через 5 мин. ⏳</div></div>`;b.scrollTop=b.scrollHeight;},1000);};
-
 document.querySelectorAll('.stars-input i').forEach(s=>s.onclick=function(){document.querySelectorAll('.stars-input i').forEach(x=>x.classList.remove('active'));this.classList.add('active');let v=parseInt(this.dataset.val);for(let k=0;k<v;k++)document.querySelectorAll('.stars-input i')[k].classList.add('active');});
 
 // === PWA SETUP ===
@@ -285,5 +308,29 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.installApp = () => {
   if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt=null; installBtn.style.display='none'; }); }
 };
+
+// HERO ANIMATIONS
+const animateCounters = () => {
+  document.querySelectorAll('.stat-num').forEach(counter => {
+    const target = +counter.dataset.target;
+    const duration = 2000;
+    const step = target / (duration / 16);
+    let current = 0;
+    const timer = setInterval(() => {
+      current += step;
+      if(current >= target){ current = target; clearInterval(timer); }
+      counter.textContent = Math.floor(current).toLocaleString('ru');
+    }, 16);
+  });
+};
+const sneaker = document.getElementById('hero-sneaker');
+if(sneaker && window.innerWidth > 900){
+  document.addEventListener('mousemove', (e) => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 20;
+    const y = (e.clientY / window.innerHeight - 0.5) * 20;
+    sneaker.style.transform = `translate(${x}px, ${y}px) rotate(${-5 + x/2}deg)`;
+  });
+}
+window.addEventListener('load', animateCounters);
 
 updateCartUI(); updateProfileUI();
