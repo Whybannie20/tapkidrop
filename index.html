@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ТапкиДроп">
+  <meta name="description" content="ТапкиДроп — премиум маркетплейс кроссовок. Проверенные пары, доставка 24ч, гарантия подлинности.">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
@@ -16,6 +17,20 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
+  <!-- PRELOADER -->
+  <div id="preloader" class="preloader">
+    <div class="preloader-bg"></div>
+    <div class="preloader-content">
+      <div class="preloader-glow"></div>
+      <div class="preloader-sneaker">👟</div>
+      <div class="preloader-text">
+        <span class="text-line">ТАПКИ</span>
+        <span class="text-line highlight">ДРОП</span>
+      </div>
+      <div class="preloader-bar"><div class="preloader-progress"></div></div>
+    </div>
+  </div>
+
   <header class="header">
     <div class="container header__inner">
       <div class="logo" onclick="navigate('home')">ТАПКИ<span>ДРОП</span></div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tapkidrop-v2'; // ИЗМЕНИЛ НА V2, ЧТОБЫ ТЕЛЕФОН ОБНОВИЛСЯ
+const CACHE_NAME = 'tapkidrop-v2';
 const ASSETS = ['/', '/index.html', '/css/style.css', '/js/app.js', '/manifest.json'];
 
 self.addEventListener('install', e => {
