@@ -193,26 +193,20 @@ function sendTelegram(orderData) {
 window.checkout = () => { 
   if(!auth.currentUser){navigate('profile');alert('Войдите в аккаунт');return;} 
   if(!cart.length) return;
-  
   const itemsList = cart.map(i=>`${i.name} (${i.size||''})`).join(', ');
   const sub = cart.reduce((s,i)=>s+i.price*(i.qty||1),0);
   const order = {id:Date.now(), user:auth.currentUser.email, items:itemsList, total:sub.toLocaleString('ru'), status:'Новый', date:new Date().toISOString()};
-  
   let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
   allOrders.push(order); localStorage.setItem('allOrders', JSON.stringify(allOrders));
-  
   cart.forEach(item => { if(!purchasedProducts.some(p=>p.id===item.id && p.user===auth.currentUser.email)) purchasedProducts.push({id:item.id, user:auth.currentUser.email, date:new Date().toISOString()}); });
   localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
-  
   sendTelegram(order);
-  
   orderCount++; localStorage.setItem('orderCount', orderCount);
   const nr=getRankData(orderCount), pr=getRankData(orderCount-1);
   if(nr.lvl>pr.lvl) showToast(`LVL ${nr.displayLvl}`, nr.title);
   alert('✅ Заказ оформлен! Ожидайте сообщения.');
   cart=[]; localStorage.setItem('cart','[]'); updateCartUI(); updateProfileUI();
 };
-
 function showToast(t,d){const el=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=d;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
 
 // PROFILE & ADMIN
@@ -227,10 +221,8 @@ const updateProfileUI = () => {
   document.getElementById('stat-orders').textContent=orderCount; document.getElementById('stat-bonus').textContent=orderCount*50;
   if(auth.currentUser) document.getElementById('username-input').value=name;
 };
-
 function renderAdmin() {
   if(!auth.currentUser) return;
-  // Простая проверка админа (замени на свою почту при деплое)
   const isAdmin = auth.currentUser.email === 'maslakov.antoni@yandex.ru';
   if(!isAdmin) return; 
   const list=document.getElementById('orders-list-admin');
@@ -274,5 +266,24 @@ window.closeSupportChat=()=>document.getElementById('support-modal').style.displ
 window.sendChatMessage=()=>{const i=document.getElementById('chat-input'),t=i.value.trim();if(!t)return;const b=document.getElementById('chat-messages');b.innerHTML+=`<div class="chat-msg user"><div class="msg-bubble">${t}</div></div>`;i.value='';b.scrollTop=b.scrollHeight;setTimeout(()=>{b.innerHTML+=`<div class="chat-msg bot"><div class="msg-bubble">Оператор ответит через 5 мин. ⏳</div></div>`;b.scrollTop=b.scrollHeight;},1000);};
 
 document.querySelectorAll('.stars-input i').forEach(s=>s.onclick=function(){document.querySelectorAll('.stars-input i').forEach(x=>x.classList.remove('active'));this.classList.add('active');let v=parseInt(this.dataset.val);for(let k=0;k<v;k++)document.querySelectorAll('.stars-input i')[k].classList.add('active');});
+
+// === PWA SETUP ===
+if('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('✅ Service Worker registered'))
+      .catch(err => console.log('❌ SW failed', err));
+  });
+}
+let deferredPrompt;
+const installBtn = document.getElementById('install-btn');
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'flex';
+});
+window.installApp = () => {
+  if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt=null; installBtn.style.display='none'; }); }
+};
 
 updateCartUI(); updateProfileUI();
