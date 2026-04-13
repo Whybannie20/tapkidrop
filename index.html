@@ -2,13 +2,11 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ТапкиДроп | Премиум маркетплейс</title>
-  <meta name="theme-color" content="#0b0c10">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ТапкиДроп | Маркетплейс кроссовок</title>
+  <meta name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="ТапкиДроп">
-  <meta name="description" content="ТапкиДроп — премиум маркетплейс кроссовок. Проверенные пары, доставка 24ч, гарантия подлинности.">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
@@ -17,206 +15,215 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
-  <header class="header">
-    <div class="container header__inner">
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-inner">
       <div class="logo" onclick="navigate('home')">ТАПКИ<span>ДРОП</span></div>
-      <div class="header__right">
-        <button class="header-btn" onclick="navigate('cart')"><i class="fa-solid fa-bag-shopping"></i>Корзина <span id="cart-badge">0</span></button>
+      <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="search-input" placeholder="Искать кроссовки...">
       </div>
+      <button class="cart-btn" onclick="navigate('cart')">
+        <i class="fa-solid fa-bag-shopping"></i>
+        <span id="cart-badge">0</span>
+      </button>
     </div>
   </header>
-  <nav class="categories-nav">
-    <div class="container">
-      <button class="cat-btn active" data-cat="all">Все</button>
-      <button class="cat-btn" data-cat="nike">Nike</button>
-      <button class="cat-btn" data-cat="adidas">Adidas</button>
-      <button class="cat-btn" data-cat="local">Локальные</button>
-    </div>
-  </nav>
 
-  <main>
-    <!-- HERO -->
-    <section id="home" class="page active hero-page">
-      <div class="hero-bg"></div>
-      <div class="container hero-container">
-        <div class="hero-content">
-          <div class="hero-badge animate-up">🔥 DROP #04 / 2026</div>
-          <h1 class="hero-title animate-up" style="animation-delay:0.1s">Стиль<br><span class="gradient-text">без компромиссов</span></h1>
-          <p class="hero-subtitle animate-up" style="animation-delay:0.2s">Премиум кроссовки. Проверка подлинности. Доставка за 24 часа.</p>
-          <div class="hero-actions animate-up" style="animation-delay:0.3s">
-            <button class="btn btn--primary btn--lg" onclick="navigate('catalog')"><i class="fa-solid fa-bag-shopping"></i> Открыть каталог</button>
-            <button class="btn btn--glass btn--lg" onclick="navigate('profile')"><i class="fa-solid fa-crown"></i> Мой аккаунт</button>
+  <!-- MAIN CONTENT -->
+  <main class="app-main">
+    <!-- HOME -->
+    <section id="home" class="page active">
+      <div class="container">
+        <div class="promo-banner">
+          <div class="promo-text">
+            <span class="promo-tag">🔥 DROP 2026</span>
+            <h1>Оригинальные кроссовки<br>с доставкой за 24ч</h1>
+            <button class="btn btn--primary" onclick="navigate('catalog')">Перейти в каталог</button>
           </div>
-          <div class="hero-stats animate-up" style="animation-delay:0.4s">
-            <div class="stat-item"><span class="stat-num" data-target="1500">0</span><span class="stat-label">Продано пар</span></div>
-            <div class="stat-item"><span class="stat-num" data-target="98">0</span><span class="stat-label">% довольных</span></div>
-            <div class="stat-item"><span class="stat-num" data-target="24">0</span><span class="stat-label">часа доставка</span></div>
-          </div>
+          <div class="promo-img">👟</div>
         </div>
-        <div class="hero-visual animate-up" style="animation-delay:0.2s">
-          <div class="glow-orb"></div>
-          <div class="sneaker-float" id="hero-sneaker">👟</div>
-          <div class="floating-badge badge-1">✅ Оригинал</div>
-          <div class="floating-badge badge-2">🚀 Fast Ship</div>
+
+        <div class="section-header">
+          <h2>Популярное</h2>
+          <a href="#" onclick="navigate('catalog'); return false;">Все →</a>
         </div>
+        <div class="grid" id="home-grid"></div>
+
+        <div class="section-header" style="margin-top:24px">
+          <h2>Новинки</h2>
+          <a href="#" onclick="navigate('catalog'); return false;">Смотреть →</a>
+        </div>
+        <div class="grid" id="new-grid"></div>
       </div>
     </section>
 
     <!-- CATALOG -->
-    <section id="catalog" class="page container">
-      <div class="grid" id="catalog-grid"></div>
+    <section id="catalog" class="page">
+      <div class="container">
+        <div class="filter-bar">
+          <button class="filter-btn active" data-cat="all">Все</button>
+          <button class="filter-btn" data-cat="nike">Nike</button>
+          <button class="filter-btn" data-cat="adidas">Adidas</button>
+          <button class="filter-btn" data-cat="newbalance">New Balance</button>
+          <button class="filter-btn" data-cat="local">Локальные</button>
+        </div>
+        <div class="grid" id="catalog-grid"></div>
+      </div>
     </section>
 
-    <!-- PRODUCT -->
-    <section id="product" class="page container">
-      <button class="back-btn" onclick="navigate('catalog')"><i class="fa-solid fa-arrow-left"></i> Назад в каталог</button>
-      <div class="product-layout">
-        <div class="product-gallery"><div class="main-img">👟</div></div>
-        <div class="product-info">
-          <div class="prod-brand" id="detail-brand">NIKE</div>
-          <h1 id="detail-name">Air Max 97</h1>
-          <div class="rating-stars" id="detail-rating">⭐⭐⭐⭐⭐ (5.0)</div>
-          <div class="price-block"><span class="current-price" id="detail-price">14 990 ₽</span></div>
-          <p class="description" id="detail-desc">Культовая модель. Идеальное состояние.</p>
-          <div class="size-selector">
-            <span class="label">Размер:</span>
-            <div class="sizes-grid" id="sizes-container"></div>
+    <!-- PRODUCT DETAIL -->
+    <section id="product" class="page">
+      <div class="container">
+        <button class="back-btn" onclick="navigate('catalog')"><i class="fa-solid fa-arrow-left"></i> Каталог</button>
+        <div class="product-detail">
+          <div class="product-media">
+            <div class="main-img" id="detail-img">👟</div>
+            <div class="img-dots"><span class="active"></span><span></span><span></span></div>
           </div>
-          <button class="btn btn--primary btn-large add-cart-btn" onclick="addToCartFromDetail()">Добавить в корзину</button>
+          <div class="product-info">
+            <div class="brand" id="detail-brand">NIKE</div>
+            <h1 id="detail-name">Air Max 97 Silver</h1>
+            <div class="rating"><span class="stars">⭐⭐⭐⭐⭐</span><span class="count">(128)</span></div>
+            <div class="price-block">
+              <span class="current" id="detail-price">14 990 ₽</span>
+              <span class="old">18 990 ₽</span>
+            </div>
+            <div class="sizes" id="sizes-container"></div>
+            <button class="btn btn--primary full btn-lg" onclick="addToCartFromDetail()">Добавить в корзину</button>
+            <div class="delivery-info">
+              <i class="fa-solid fa-truck-fast"></i>
+              <span>Доставка завтра, <b>бесплатно</b> от 5 000 ₽</span>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="reviews-section">
-        <h3 class="section-title">Отзывы покупателей</h3>
-        <div class="reviews-list" id="reviews-list"></div>
-        <div class="add-review-box" id="review-box" style="display:none">
-          <h4>Оставить отзыв</h4>
-          <div class="stars-input">
-            <i class="fa-regular fa-star" data-val="1"></i><i class="fa-regular fa-star" data-val="2"></i><i class="fa-regular fa-star" data-val="3"></i><i class="fa-regular fa-star" data-val="4"></i><i class="fa-regular fa-star" data-val="5"></i>
+
+        <div class="reviews-section">
+          <h3>Отзывы покупателей</h3>
+          <div class="reviews-list" id="reviews-list"></div>
+          <div class="add-review-box" id="review-box" style="display:none">
+            <h4>Оставить отзыв</h4>
+            <div class="stars-input">
+              <i class="fa-regular fa-star" data-val="1"></i><i class="fa-regular fa-star" data-val="2"></i><i class="fa-regular fa-star" data-val="3"></i><i class="fa-regular fa-star" data-val="4"></i><i class="fa-regular fa-star" data-val="5"></i>
+            </div>
+            <textarea id="review-text" placeholder="Напишите ваше мнение..."></textarea>
+            <div class="photo-upload">
+              <label class="upload-label"><i class="fa-solid fa-camera"></i> Фото<input type="file" id="review-photo" accept="image/*" multiple hidden></label>
+              <div class="photo-preview" id="photo-preview"></div>
+            </div>
+            <button class="btn btn--primary" onclick="submitReview()">Отправить</button>
           </div>
-          <textarea id="review-text" placeholder="Напишите ваше мнение..."></textarea>
-          <div class="photo-upload">
-            <label class="upload-label"><i class="fa-solid fa-camera"></i> Добавить фото<input type="file" id="review-photo" accept="image/*" multiple hidden></label>
-            <div class="photo-preview" id="photo-preview"></div>
-          </div>
-          <button class="btn btn--glass btn-sm" onclick="submitReview()">Отправить</button>
+          <div id="no-review-msg" style="text-align:center;padding:20px;color:var(--muted)"><p>💡 Чтобы оставить отзыв, сначала купите этот товар</p></div>
         </div>
-        <div id="no-review-msg" style="text-align:center;padding:20px;color:var(--text-muted)"><p>💡 Чтобы оставить отзыв, сначала купите этот товар</p></div>
       </div>
     </section>
 
     <!-- CART -->
-    <section id="cart" class="page cart-page">
+    <section id="cart" class="page">
       <div class="container">
-        <h1 class="page-title"><i class="fa-solid fa-bag-shopping"></i> Корзина</h1>
-        <div class="cart-layout">
-          <div class="cart-items-section"><div class="empty-state" id="cart-empty"><i class="fa-solid fa-basket-shopping"></i><p>Пусто</p><button class="btn btn--primary" onclick="navigate('catalog')">В каталог</button></div><div id="cart-items" style="display:none"></div></div>
-          <div class="cart-summary-section">
-            <div class="summary-card">
-              <h3>Заказ</h3>
-              <div class="summary-row"><span>Товары</span><span id="cart-subtotal">0 ₽</span></div>
-              <div class="summary-row discount-row" id="discount-row" style="display:none"><span>Скидка (<span id="discount-lvl">0</span>%)</span><span id="discount-amount">-0 ₽</span></div>
-              <div class="summary-row total"><span>Итого</span><span id="cart-total">0 ₽</span></div>
-              <button class="btn btn--primary full btn-large" onclick="checkout()">Оформить заказ</button>
-            </div>
+        <h1 class="page-title">Корзина</h1>
+        <div class="cart-empty" id="cart-empty" style="display:none">
+          <div class="empty-icon">🛒</div>
+          <p>В корзине пока пусто</p>
+          <button class="btn btn--primary" onclick="navigate('catalog')">Перейти в каталог</button>
+        </div>
+        <div class="cart-layout" id="cart-layout" style="display:none">
+          <div class="cart-items" id="cart-items"></div>
+          <div class="cart-summary">
+            <div class="summary-row"><span>Товары</span><span id="cart-subtotal">0 ₽</span></div>
+            <div class="summary-row discount" id="discount-row" style="display:none"><span>Скидка (<span id="discount-lvl">0</span>%)</span><span id="discount-amount">-0 ₽</span></div>
+            <div class="summary-row total"><span>Итого</span><span id="cart-total">0 ₽</span></div>
+            <button class="btn btn--primary full btn-lg" onclick="checkout()">Оформить заказ</button>
+            <p class="safe-pay">🔒 Безопасная оплата. Гарантия возврата 14 дней.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- PROFILE -->
-    <section id="profile" class="page profile-page">
-      <div class="profile-banner">
-        <div class="banner-pattern"></div>
-        <div class="banner-content">
-          <div class="profile-avatar-wrap"><div class="avatar-glow"></div><div class="profile-avatar" id="profile-avatar">👤</div><div class="online-dot"></div></div>
-          <h2 id="profile-display-name" style="margin:0;font-size:1.5rem;font-weight:700">Гость</h2>
-          <p id="profile-email" class="profile-email-text">Войдите в аккаунт</p>
-        </div>
+    <!-- PROFILE (НЕ ТРОГАЕМ ЛОГИКУ, ТОЛЬКО СТИЛИ) -->
+    <section id="profile" class="page">
+      <div class="profile-header">
+        <div class="avatar-wrap"><div class="avatar">👤</div></div>
+        <h2 id="profile-display-name">Гость</h2>
+        <p id="profile-email" class="email">Войдите в аккаунт</p>
       </div>
-      <div class="profile-body">
+      <div class="container">
         <div class="stats-row">
-          <div class="stat-card-v2"><div class="stat-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">📦</div><div><span class="stat-number" id="stat-orders">0</span><small class="stat-label">Заказов</small></div></div>
-          <div class="stat-card-v2"><div class="stat-icon" style="background:linear-gradient(135deg,#ef4444,#f97316)">❤️</div><div><span class="stat-number" id="stat-fav">0</span><small class="stat-label">Избранное</small></div></div>
-          <div class="stat-card-v2"><div class="stat-icon" style="background:linear-gradient(135deg,#f59e0b,#eab308)">💰</div><div><span class="stat-number" id="stat-bonus">0</span><small class="stat-label">Бонусы</small></div></div>
-          <div class="stat-card-v2"><div class="stat-icon" style="background:linear-gradient(135deg,#10b981,#14b8a6)">⭐</div><div><span class="stat-number" id="stat-reviews">0</span><small class="stat-label">Отзыва</small></div></div>
+          <div class="stat"><span id="stat-orders">0</span><small>Заказов</small></div>
+          <div class="stat"><span id="stat-bonus">0</span><small>Бонусы</small></div>
+          <div class="stat"><span id="user-lvl">0</span><small>Уровень</small></div>
+          <div class="stat"><span id="user-discount">0</span><small>Скидка</small></div>
         </div>
-        <div class="level-card">
-          <div class="level-header">
-            <div class="level-badge-large">LVL <span id="user-lvl">0</span></div>
-            <div class="level-info"><h3 id="user-title">Гость</h3><div class="discount-tag">Персональная скидка: <span id="user-discount">0</span>%</div></div>
-          </div>
-          <div class="progress-container"><div class="progress-track"><div class="progress-fill" id="lvl-progress" style="width:0%"></div></div><span class="progress-text" id="progress-text">До следующего уровня: 1 заказ</span></div>
+        <div class="level-bar">
+          <div class="track"><div class="fill" id="lvl-progress" style="width:0%"></div></div>
+          <span id="progress-text">До следующего уровня: 1 заказ</span>
         </div>
         <div class="settings-card" id="settings-card" style="display:none">
-          <h3 class="section-title"><i class="fa-solid fa-user-pen"></i> Настройки профиля</h3>
-          <div class="input-group"><label style="display:block;margin-bottom:6px;font-size:0.9rem;color:var(--text-muted)">Ваше имя</label><input type="text" id="username-input" placeholder="Как к вам обращаться?" class="input" style="padding-left:12px"></div>
-          <button class="btn btn--primary" onclick="saveUsername()">Сохранить имя</button>
+          <h3>Настройки профиля</h3>
+          <div class="input-group"><input type="text" id="username-input" placeholder="Ваше имя" class="input"></div>
+          <button class="btn btn--primary" onclick="saveUsername()">Сохранить</button>
         </div>
-        <div class="perks-section" id="perks-container">
-          <h3 class="section-label"><i class="fa-solid fa-gem"></i> Ваши привилегии</h3>
-          <div class="perks-grid" id="perks-grid"></div>
-        </div>
-        <div class="menu-section">
-          <h3 class="section-label"><i class="fa-solid fa-sliders"></i> Настройки</h3>
-          <div class="menu-grid">
-            <div class="menu-card-v2" onclick="document.getElementById('settings-card').style.display='block'"><i class="fa-solid fa-user-pen"></i><span>Изменить имя</span><i class="fa-solid fa-chevron-right"></i></div>
-            <div class="menu-card-v2"><i class="fa-solid fa-bag-shopping"></i><span>Мои заказы</span><i class="fa-solid fa-chevron-right"></i></div>
-            <div class="menu-card-v2" onclick="openSupportChat()"><i class="fa-solid fa-headset"></i><span>Чат поддержки</span><i class="fa-solid fa-comment-dots"></i></div>
-          </div>
+        <div class="menu-grid">
+          <div class="menu-item" onclick="document.getElementById('settings-card').style.display='block'"><i class="fa-solid fa-user-pen"></i><span>Изменить имя</span><i class="fa-solid fa-chevron-right"></i></div>
+          <div class="menu-item"><i class="fa-solid fa-bag-shopping"></i><span>Мои заказы</span><i class="fa-solid fa-chevron-right"></i></div>
+          <div class="menu-item" onclick="openSupportChat()"><i class="fa-solid fa-headset"></i><span>Поддержка</span><i class="fa-solid fa-chevron-right"></i></div>
         </div>
         <div id="auth-flow">
-          <div class="auth-card-v2">
-            <div class="auth-header"><div class="auth-logo">👟</div><h3>Добро пожаловать!</h3><p>Войдите для доступа к бонусам</p></div>
+          <div class="auth-card">
+            <h3>Вход в аккаунт</h3>
             <div class="tabs">
               <button class="tab active" data-tab="login">Вход</button>
               <button class="tab" data-tab="register">Регистрация</button>
             </div>
             <form id="auth-form">
-              <div class="input-group"><i class="fa-regular fa-envelope"></i><input type="email" id="email-input" placeholder="Email" class="input" required></div>
-              <div class="input-group"><i class="fa-solid fa-lock"></i><input type="password" id="pass-input" placeholder="Пароль" class="input" required></div>
-              <div id="auth-error" class="auth-error" style="display:none"></div>
-              <button type="submit" class="btn btn--primary full btn-large" id="auth-submit">Войти</button>
+              <input type="email" id="email-input" placeholder="Email" class="input" required>
+              <input type="password" id="pass-input" placeholder="Пароль" class="input" required>
+              <div id="auth-error" class="error" style="display:none"></div>
+              <button type="submit" class="btn btn--primary full" id="auth-submit">Войти</button>
             </form>
           </div>
         </div>
         <div id="profile-actions" style="display:none">
-          <button id="logout-btn" class="btn btn--danger full btn-large"><i class="fa-solid fa-arrow-right-from-bracket"></i> Выйти</button>
+          <button id="logout-btn" class="btn btn--danger full">Выйти</button>
         </div>
       </div>
     </section>
 
     <!-- ADMIN -->
-    <section id="admin" class="page container">
-      <button class="back-btn" onclick="navigate('profile')"><i class="fa-solid fa-arrow-left"></i> В профиль</button>
-      <h1 class="page-title"><i class="fa-solid fa-chart-line"></i> Панель управления</h1>
-      <div class="admin-grid">
-        <div class="admin-card"><h3>Заказы</h3><div id="orders-list-admin" class="orders-list"></div></div>
-        <div class="admin-card">
-          <h3>Действия</h3><p class="muted">Тестовые функции для отладки</p>
-          <button class="btn btn--outline full" onclick="clearAllOrders()" style="margin-top:10px;color:var(--danger);border-color:var(--danger)">🗑 Очистить все заказы</button>
-          <button class="btn btn--outline full" onclick="exportOrders()" style="margin-top:10px">📋 Копировать список</button>
+    <section id="admin" class="page">
+      <div class="container">
+        <button class="back-btn" onclick="navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
+        <h1>Панель управления</h1>
+        <div class="admin-grid">
+          <div class="admin-card"><h3>Заказы</h3><div id="orders-list-admin" class="orders-list"></div></div>
+          <div class="admin-card">
+            <h3>Действия</h3>
+            <button class="btn btn--outline full" onclick="clearAllOrders()" style="margin-top:10px;color:var(--danger);border-color:var(--danger)">🗑 Очистить</button>
+            <button class="btn btn--outline full" onclick="exportOrders()" style="margin-top:10px">📋 Копировать</button>
+          </div>
         </div>
       </div>
     </section>
   </main>
 
+  <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
-    <button class="nav-item active" data-target="home"><i class="fa-solid fa-house"></i>Главная</button>
-    <button class="nav-item" data-target="catalog"><i class="fa-solid fa-store"></i>Каталог</button>
-    <button class="nav-item" data-target="cart"><i class="fa-solid fa-bag-shopping"></i>Корзина</button>
-    <button class="nav-item" data-target="profile"><i class="fa-regular fa-user"></i>Профиль</button>
+    <button class="nav-item active" data-target="home"><i class="fa-solid fa-house"></i><span>Главная</span></button>
+    <button class="nav-item" data-target="catalog"><i class="fa-solid fa-store"></i><span>Каталог</span></button>
+    <button class="nav-item" data-target="cart"><i class="fa-solid fa-bag-shopping"></i><span>Корзина</span></button>
+    <button class="nav-item" data-target="profile"><i class="fa-regular fa-user"></i><span>Профиль</span></button>
   </nav>
 
-  <div id="support-modal" class="modal-overlay" style="display:none;">
+  <!-- MODALS -->
+  <div id="support-modal" class="modal" style="display:none">
     <div class="modal-box">
-      <div class="modal-header"><h3><i class="fa-solid fa-headset"></i> Поддержка</h3><button onclick="closeSupportChat()" class="close-btn">✕</button></div>
-      <div class="modal-body" id="chat-messages"><div class="chat-msg bot"><div class="msg-bubble">Привет! 👋 Опишите проблему.</div></div></div>
-      <div class="modal-footer"><input type="text" id="chat-input" placeholder="Сообщение..." class="chat-input"><button onclick="sendChatMessage()" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button></div>
+      <div class="modal-head"><h3>Поддержка</h3><button onclick="closeSupportChat()">✕</button></div>
+      <div class="modal-body" id="chat-messages"><div class="msg bot">Привет! Чем помочь?</div></div>
+      <div class="modal-foot"><input type="text" id="chat-input" placeholder="Сообщение..."><button onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button></div>
     </div>
   </div>
 
-  <div id="level-toast" class="level-toast"><div class="toast-icon">🚀</div><div class="toast-content"><div class="toast-title">Новый уровень!</div><div class="toast-desc" id="toast-desc"></div></div></div>
-  <button id="install-btn" style="display:none;position:fixed;bottom:90px;right:20px;background:var(--primary);color:#fff;border:none;border-radius:50%;width:56px;height:56px;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 12px rgba(99,102,241,0.4);z-index:99" onclick="installApp()">📲</button>
+  <div id="level-toast" class="toast"><div class="toast-icon">🚀</div><div><div class="toast-title">Новый уровень!</div><div class="toast-desc" id="toast-desc"></div></div></div>
 
   <script src="js/app.js"></script>
 </body>
