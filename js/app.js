@@ -9,6 +9,7 @@ const firebaseConfig = {
 };
 if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+// 🔒 Сессия сохраняется даже после закрытия браузера/PWA
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
 // === TELEGRAM CONFIG ===
@@ -25,17 +26,17 @@ let selectedPhotos = [];
 
 // DATA
 const products = [
-  {id:1,brand:'nike',name:'Air Max 97 Silver',price:14990,desc:'Культовая модель с системой амортизации Air. Отличное состояние.',sizes:[39,40,41,42,43,44],rating:4.8,reviews:128},
+  {id:1,brand:'nike',name:'Air Max 97 Silver',price:14990,desc:'Культовая модель с системой амортизации Air.',sizes:[39,40,41,42,43,44],rating:4.8,reviews:128},
   {id:2,brand:'adidas',name:'Ultraboost 22',price:12990,desc:'Максимальный комфорт. Технология Boost.',sizes:[40,41,42,43],rating:4.7,reviews:94},
-  {id:3,brand:'newbalance',name:'550 White Green',price:11990,desc:'Ретро-баскетбольный силуэт. Натуральная кожа.',sizes:[41,42,43,44],rating:4.9,reviews:215},
+  {id:3,brand:'newbalance',name:'550 White Green',price:11990,desc:'Ретро-силуэт. Натуральная кожа.',sizes:[41,42,43,44],rating:4.9,reviews:215},
   {id:4,brand:'local',name:'Street Runner V3',price:4990,desc:'Локальный бренд. Легкие и дышащие.',sizes:[38,39,40,41,42],rating:4.5,reviews:42},
-  {id:5,brand:'nike',name:'Dunk Low Retro',price:13490,desc:'Классика стритвира. Универсальная модель.',sizes:[39,40,41,42,43],rating:4.8,reviews:156},
+  {id:5,brand:'nike',name:'Dunk Low Retro',price:13490,desc:'Классика стритвира.',sizes:[39,40,41,42,43],rating:4.8,reviews:156},
   {id:6,brand:'adidas',name:'Forum Low',price:10990,desc:'Винтажный баскетбольный стиль.',sizes:[40,41,42],rating:4.6,reviews:78}
 ];
 
 // REVIEWS & PROFILES
 let allReviews = JSON.parse(localStorage.getItem('allReviews')) || {
-  1: [{user:'Alex',name:'Алексей',stars:5,text:'Топ пушки, качество огонь!',date:'10.04.2026',photos:[]}],
+  1: [{user:'Alex',name:'Алексей',stars:5,text:'Топ, качество огонь!',date:'10.04.2026',photos:[]}],
   2: [{user:'Max',name:'Макс',stars:4,text:'Удобные, но маломерят.',date:'09.04.2026',photos:[]}]
 };
 const saveReviews = () => localStorage.setItem('allReviews', JSON.stringify(allReviews));
@@ -51,11 +52,11 @@ const ranks = [
   { lvl: 3, title: 'Дроп-охотник', discount: 3, perks: [] },
   { lvl: 4, title: 'Уличный стиль', discount: 4, perks: [] },
   { lvl: 5, title: 'Гуру кроссовок', discount: 5, perks: ['Скидка на аксессуары'] },
-  { lvl: 6, title: 'Коллекционер', discount: 6, perks: ['Скидка на аксессуары', 'Ранний доступ'] },
-  { lvl: 7, title: 'Трендсеттер', discount: 7, perks: ['Скидка', 'Ранний доступ', 'Приоритетная поддержка'] },
+  { lvl: 6, title: 'Коллекционер', discount: 6, perks: ['Скидка', 'Ранний доступ'] },
+  { lvl: 7, title: 'Трендсеттер', discount: 7, perks: ['Скидка', 'Ранний доступ', 'Поддержка'] },
   { lvl: 8, title: 'Амбассадор', discount: 8, perks: ['Скидка', 'Ранний доступ', 'Поддержка', 'Упаковка'] },
   { lvl: 9, title: 'VIP', discount: 9, perks: ['Скидка', 'Ранний доступ', 'Поддержка', 'Упаковка', 'Менеджер'] },
-  { lvl: 10, title: 'Легенда', discount: 10, perks: ['Макс. скидка 10%', 'Бесплатная доставка', 'Эксклюзивы', 'Менеджер', 'Возврат 30 дней'] }
+  { lvl: 10, title: 'Легенда', discount: 10, perks: ['Скидка 10%', 'Бесплатная доставка', 'Эксклюзивы', 'Менеджер', 'Возврат 30 дней'] }
 ];
 function getRankData(count) {
   const lvl = Math.min(count, 10);
@@ -89,7 +90,10 @@ const createCard = p => `
     </div>
   </div>`;
 
-const renderGrid = (id, list) => document.getElementById(id).innerHTML = list.map(createCard).join('');
+const renderGrid = (id, list) => {
+  const el = document.getElementById(id);
+  if(el) el.innerHTML = list.map(createCard).join('');
+};
 
 // INIT CATALOGS
 renderGrid('home-grid', products.slice(0,4));
@@ -107,7 +111,8 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 });
 
 // SEARCH
-document.getElementById('search-input').addEventListener('input', e => {
+const searchInput = document.getElementById('search-input');
+if(searchInput) searchInput.addEventListener('input', e => {
   const q = e.target.value.toLowerCase();
   renderGrid('catalog-grid', products.filter(p => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q)));
 });
@@ -121,7 +126,8 @@ window.openProduct = id => {
   document.getElementById('detail-price').textContent = p.price.toLocaleString('ru') + ' ₽';
   document.getElementById('sizes-container').innerHTML = p.sizes.map(s => `<button class="size-btn" onclick="selectSize(this, ${s})">${s}</button>`).join('');
   const revs = allReviews[id] || [];
-  document.querySelector('#product .rating').innerHTML = `<span class="stars">⭐${'⭐'.repeat(Math.floor(p.rating))}</span><span class="count">(${revs.length || p.reviews})</span>`;
+  const ratingEl = document.querySelector('#product .rating');
+  if(ratingEl) ratingEl.innerHTML = `<span class="stars">⭐${'⭐'.repeat(Math.floor(p.rating))}</span><span class="count">(${revs.length || p.reviews})</span>`;
   renderReviews(id); checkReviewAvailability(id); navigate('product');
 };
 window.selectSize = (btn, size) => {
@@ -139,6 +145,7 @@ window.addToCartFromDetail = () => {
 // REVIEWS
 function checkReviewAvailability(productId) {
   const box = document.getElementById('review-box'), msg = document.getElementById('no-review-msg');
+  if(!box || !msg) return;
   if(!auth.currentUser) { box.style.display='none'; msg.innerHTML='<p>💡 <a href="#" onclick="navigate(\'profile\')" style="color:var(--primary)">Войдите</a> для отзыва</p>'; msg.style.display='block'; return; }
   const has = purchasedProducts.some(p => p.id === productId && p.user === auth.currentUser.email);
   const done = (allReviews[productId]||[]).some(r => r.user === auth.currentUser.email);
@@ -148,6 +155,7 @@ function checkReviewAvailability(productId) {
 }
 function renderReviews(id) {
   const list = document.getElementById('reviews-list');
+  if(!list) return;
   const revs = allReviews[id] || [];
   list.innerHTML = revs.length ? revs.map(r => `
     <div class="review-card">
@@ -159,7 +167,8 @@ function renderReviews(id) {
 }
 window.submitReview = () => {
   const txt = document.getElementById('review-text').value.trim();
-  const stars = document.querySelector('#product .stars-input .active')?.dataset.val || 5;
+  const starsEl = document.querySelector('#product .stars-input .active');
+  const stars = starsEl ? starsEl.dataset.val : 5;
   if(!txt){alert('Напишите текст');return;}
   if(!auth.currentUser){alert('Войдите в аккаунт');return;}
   const rev = {user:auth.currentUser.email, name:getUserProfile(auth.currentUser.email), stars:parseInt(stars), text:txt, date:new Date().toLocaleDateString('ru'), photos:selectedPhotos};
@@ -181,8 +190,10 @@ document.getElementById('review-photo')?.addEventListener('change', e => {
 // CART
 const updateCartUI = () => {
   const rank = getRankData(orderCount);
-  document.getElementById('cart-badge').textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
+  const badge = document.getElementById('cart-badge');
+  if(badge) badge.textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
   const empty=document.getElementById('cart-empty'), layout=document.getElementById('cart-layout');
+  if(!empty || !layout) return;
   if(!cart.length){empty.style.display='block';layout.style.display='none';return;}
   empty.style.display='none';layout.style.display='grid';
   document.getElementById('cart-items').innerHTML = cart.map((i,idx)=>`
@@ -262,7 +273,7 @@ function renderAdmin() {
 window.clearAllOrders=()=>{if(confirm('Удалить историю?')){localStorage.removeItem('allOrders');renderAdmin();}};
 window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р`).join('\n'));alert('Скопировано!');};
 
-// AUTH
+// AUTH (FIXED PERSISTENCE)
 const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
 let isLogin=true;
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
@@ -286,7 +297,8 @@ authForm.onsubmit=async e=>{
   } finally { authSub.disabled=false; authSub.textContent=isLogin?'Войти':'Создать аккаунт'; }
 };
 
-auth.onAuthStateChanged(user=>{
+// 🔄 Принудительное восстановление сессии
+auth.onAuthStateChanged(user => {
   if(user){
     document.getElementById('auth-flow').style.display='none';
     document.getElementById('profile-actions').style.display='block';
@@ -310,10 +322,42 @@ auth.onAuthStateChanged(user=>{
 });
 document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
-// CHAT
+// 🤖 SMART SUPPORT CHAT
+const faqDB = {
+  'доставк|доставка|сроки|когда придёт': '🚚 Доставка по РФ: 1-3 дня. Бесплатно от 5000₽. Трек-номер придет в SMS сразу после отправки.',
+  'возврат|обмен|вернуть|не подошёл': '↩️ Возврат в течение 14 дней без вопросов. Курьер заберет товар бесплатно. Деньги вернутся за 1-3 дня.',
+  'оплат|карт|сбер|тиьков|сбп|наложен': '💳 Принимаем карты МИР, Visa, Mastercard, СБП. Оплата безопасно через защищенный шлюз. Наложенный платеж не доступен.',
+  'размер|маломерит|большемерит|таблиц|нога': '📏 Все размеры по европейской сетке. Если сомневаетесь — берите на 0.5 размера больше. Таблица есть в карточке товара.',
+  'оригинал|подделк|проверк|легит': '✅ 100% оригинал. Каждая пара проходит проверку на Legit Check. Прилагается чек и гарантия подлинности.',
+  'промокод|скидк|купон|акци': '🎁 Введите TAPKI2026 при оформлении для скидки -15%. Скидки не суммируются.',
+  'контакт|телефон|почт|связ|менеджер': '📞 Поддержка: @tapkidrop_support в Telegram. Email: help@tapkidrop.ru. Работаем 24/7.'
+};
+
 window.openSupportChat=()=>document.getElementById('support-modal').style.display='flex';
 window.closeSupportChat=()=>document.getElementById('support-modal').style.display='none';
-window.sendChatMessage=()=>{const i=document.getElementById('chat-input'),t=i.value.trim();if(!t)return;const b=document.getElementById('chat-messages');b.innerHTML+=`<div class="msg user">${t}</div>`;i.value='';b.scrollTop=b.scrollHeight;setTimeout(()=>{b.innerHTML+=`<div class="msg bot">Оператор ответит через 5 мин. ⏳</div>`;b.scrollTop=b.scrollHeight;},1000);};
+window.sendChatMessage=()=>{
+  const i=document.getElementById('chat-input'), t=i.value.trim();
+  if(!t) return;
+  const b=document.getElementById('chat-messages');
+  b.innerHTML+=`<div class="msg user">${t}</div>`;
+  i.value='';
+  
+  // Поиск ответа
+  const lower = t.toLowerCase();
+  let reply = null;
+  for(const [keys, ans] of Object.entries(faqDB)) {
+    if(keys.split('|').some(k => lower.includes(k))) {
+      reply = ans; break;
+    }
+  }
+  
+  setTimeout(()=>{
+    const finalMsg = reply || '👋 Спасибо за обращение! Оператор подключится в течение 5 минут. ⏳';
+    b.innerHTML+=`<div class="msg bot">${finalMsg}</div>`;
+    b.scrollTop=b.scrollHeight;
+  }, 400);
+  b.scrollTop=b.scrollHeight;
+};
 
 document.querySelectorAll('.stars-input i').forEach(s=>s.onclick=function(){document.querySelectorAll('.stars-input i').forEach(x=>x.classList.remove('active'));this.classList.add('active');let v=parseInt(this.dataset.val);for(let k=0;k<v;k++)document.querySelectorAll('.stars-input i')[k].classList.add('active');});
 
