@@ -178,3 +178,8 @@ a { text-decoration: none; color: inherit; }
 .btn--danger { background: rgba(255,59,48,0.1); color: var(--danger); border: 1px solid rgba(255,59,48,0.2); }
 .btn--outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .full { width: 100%; }
+/* SUPPORT QUICK REPLIES */
+.quick-replies { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+.quick-reply-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; white-space: nowrap; color: var(--text); }
+.quick-reply-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.quick-reply-btn:active { transform: scale(0.98); }

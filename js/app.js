@@ -297,7 +297,6 @@ authForm.onsubmit=async e=>{
   } finally { authSub.disabled=false; authSub.textContent=isLogin?'Войти':'Создать аккаунт'; }
 };
 
-// 🔄 Принудительное восстановление сессии
 auth.onAuthStateChanged(user => {
   if(user){
     document.getElementById('auth-flow').style.display='none';
@@ -322,42 +321,90 @@ auth.onAuthStateChanged(user => {
 });
 document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
-// 🤖 SMART SUPPORT CHAT
+// 🤖 SMART SUPPORT CHAT (MARKETPLACE STYLE)
 const faqDB = {
-  'доставк|доставка|сроки|когда придёт': '🚚 Доставка по РФ: 1-3 дня. Бесплатно от 5000₽. Трек-номер придет в SMS сразу после отправки.',
-  'возврат|обмен|вернуть|не подошёл': '↩️ Возврат в течение 14 дней без вопросов. Курьер заберет товар бесплатно. Деньги вернутся за 1-3 дня.',
-  'оплат|карт|сбер|тиьков|сбп|наложен': '💳 Принимаем карты МИР, Visa, Mastercard, СБП. Оплата безопасно через защищенный шлюз. Наложенный платеж не доступен.',
-  'размер|маломерит|большемерит|таблиц|нога': '📏 Все размеры по европейской сетке. Если сомневаетесь — берите на 0.5 размера больше. Таблица есть в карточке товара.',
-  'оригинал|подделк|проверк|легит': '✅ 100% оригинал. Каждая пара проходит проверку на Legit Check. Прилагается чек и гарантия подлинности.',
-  'промокод|скидк|купон|акци': '🎁 Введите TAPKI2026 при оформлении для скидки -15%. Скидки не суммируются.',
-  'контакт|телефон|почт|связ|менеджер': '📞 Поддержка: @tapkidrop_support в Telegram. Email: help@tapkidrop.ru. Работаем 24/7.'
+  'доставк|сроки|где заказ|трек|когда придёт|статус': '🚚 Доставка по РФ: 1-3 дня. Бесплатно от 5000₽. Трек-номер придет в SMS сразу после отправки. Статус заказа в разделе "Профиль → Мои заказы".',
+  'возврат|вернуть|деньги назад|отказ|не понравил': '↩️ Возврат в течение 14 дней, если не носили и сохранили вид/бирки. Курьер заберет бесплатно. Деньги вернутся за 1-3 дня.',
+  'размер|маломерит|большемерит|таблица|нога|полнот|см': '📏 Размеры по евро-сетке. Если стопа между размерами — берите больше. Замерьте стельку старой обуви в см и сверьте с таблицей в карточке.',
+  'оплат|карт|сбер|тиьков|сбп|наложен|рассрочк|кредит': '💳 Карты МИР, Visa, Mastercard, СБП. Есть рассрочка через Т-Банк и Сбер на 3-6 мес без переплат.',
+  'промокод|скидк|купон|акци|бонус|баллы': '🎁 Введите TAPKI2026 для скидки -15%. Бонусы за отзывы и заказы. Скидки не суммируются.',
+  'качество|материал|кож|замш|текстиль|швы|клей|брак': '👟 Указываем материалы в карточке. Все партии проходят контроль. Если нашли заводской брак — заменим бесплатно в течение 30 дней.',
+  'обмен|другой размер|цвет|подобрать|не подошел': '🔄 Обмен размера/цвета возможен в течение 7 дней. Оформите возврат и закажите нужную пару заново.',
+  'оператор|человек|живой|связ|жалоб|проблем|не работает|позвон': '👨‍ Оператор подключится в течение 5 мин. Оставьте номер телефона или email в чате, и мы перезвоним.',
+  'грязь|чистка|уход|подошва|стирк|вода|пятн': '🧼 Рекомендуем специальную пену для кроссовок. Не стирайте в машинке. Протирайте влажной салфеткой, сушите при комнатной температуре.',
+  'подарок|упаковк|коробк|состояни|нов|следы носк': '🎁 Доставка в фирменной коробке. По запросу добавим подарочный пакет (+199₽). Все пары новые, без следов носки.'
 };
 
-window.openSupportChat=()=>document.getElementById('support-modal').style.display='flex';
-window.closeSupportChat=()=>document.getElementById('support-modal').style.display='none';
-window.sendChatMessage=()=>{
-  const i=document.getElementById('chat-input'), t=i.value.trim();
-  if(!t) return;
-  const b=document.getElementById('chat-messages');
-  b.innerHTML+=`<div class="msg user">${t}</div>`;
-  i.value='';
-  
-  // Поиск ответа
-  const lower = t.toLowerCase();
+const quickReplies = [
+  "📦 Где мой заказ?",
+  "↩️ Как вернуть?",
+  "📏 Подбор размера",
+  "💳 Оплата и рассрочка",
+  "🏷️ Промокод / Скидки",
+  "👟 Качество и материалы",
+  "🔄 Обмен размера",
+  "🧼 Уход за кроссовками",
+  "👨‍💼 Связаться с оператором"
+];
+
+window.openSupportChat = () => {
+  document.getElementById('support-modal').style.display = 'flex';
+  const chatBox = document.getElementById('chat-messages');
+  chatBox.innerHTML = '<div class="msg bot">👋 Привет! Я помощник ТапкиДроп. Выберите вопрос или напишите свой:</div>';
+  renderQuickReplies();
+};
+
+function renderQuickReplies() {
+  const chatBox = document.getElementById('chat-messages');
+  const old = chatBox.querySelector('.quick-replies');
+  if(old) old.remove();
+
+  const container = document.createElement('div');
+  container.className = 'quick-replies';
+  quickReplies.forEach(text => {
+    const btn = document.createElement('button');
+    btn.className = 'quick-reply-btn';
+    btn.textContent = text;
+    btn.onclick = () => sendQuickReply(text);
+    container.appendChild(btn);
+  });
+  chatBox.appendChild(container);
+}
+
+window.sendQuickReply = (text) => handleChatInput(text);
+window.sendChatMessage = () => {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+  handleChatInput(text);
+};
+
+function handleChatInput(text) {
+  const chatBox = document.getElementById('chat-messages');
+  const qr = chatBox.querySelector('.quick-replies');
+  if(qr) qr.remove();
+
+  chatBox.innerHTML += `<div class="msg user">${text}</div>`;
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  const lower = text.toLowerCase();
   let reply = null;
   for(const [keys, ans] of Object.entries(faqDB)) {
     if(keys.split('|').some(k => lower.includes(k))) {
       reply = ans; break;
     }
   }
-  
-  setTimeout(()=>{
-    const finalMsg = reply || '👋 Спасибо за обращение! Оператор подключится в течение 5 минут. ⏳';
-    b.innerHTML+=`<div class="msg bot">${finalMsg}</div>`;
-    b.scrollTop=b.scrollHeight;
+
+  setTimeout(() => {
+    const finalMsg = reply || '🤔 Не совсем понял вопрос. Уточните, или нажмите кнопку ниже.';
+    chatBox.innerHTML += `<div class="msg bot">${finalMsg}</div>`;
+    if(!reply) {
+      chatBox.innerHTML += `<div class="quick-replies"><button class="quick-reply-btn" onclick="sendQuickReply('👨‍💼 Связаться с оператором')">👨‍ Связаться с оператором</button></div>`;
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
   }, 400);
-  b.scrollTop=b.scrollHeight;
-};
+}
 
 document.querySelectorAll('.stars-input i').forEach(s=>s.onclick=function(){document.querySelectorAll('.stars-input i').forEach(x=>x.classList.remove('active'));this.classList.add('active');let v=parseInt(this.dataset.val);for(let k=0;k<v;k++)document.querySelectorAll('.stars-input i')[k].classList.add('active');});
 
