@@ -11,11 +11,14 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
-  <!-- HEADER -->
+
+  <!-- === HEADER === -->
   <header class="app-header">
     <div class="header-inner">
       <div class="logo" onclick="navigate('home')">ТАПКИ<span>ДРОП</span></div>
@@ -30,15 +33,16 @@
     </div>
   </header>
 
-  <!-- MAIN CONTENT -->
+  <!-- === MAIN CONTENT === -->
   <main class="app-main">
-    <!-- HOME -->
+    
+    <!-- 1. HOME PAGE -->
     <section id="home" class="page active">
       <div class="container">
         <div class="promo-banner">
           <div class="promo-text">
             <span class="promo-tag">🔥 DROP 2026</span>
-            <h1>Оригинальные кроссовки<br>с доставкой за 24ч</h1>
+            <h1>Стиль без компромиссов<br>Доставка за 24ч</h1>
             <button class="btn btn--primary" onclick="navigate('catalog')">Перейти в каталог</button>
           </div>
           <div class="promo-img">👟</div>
@@ -58,7 +62,7 @@
       </div>
     </section>
 
-    <!-- CATALOG -->
+    <!-- 2. CATALOG PAGE -->
     <section id="catalog" class="page">
       <div class="container">
         <div class="filter-bar">
@@ -72,7 +76,7 @@
       </div>
     </section>
 
-    <!-- PRODUCT DETAIL -->
+    <!-- 3. PRODUCT DETAIL PAGE -->
     <section id="product" class="page">
       <div class="container">
         <button class="back-btn" onclick="navigate('catalog')"><i class="fa-solid fa-arrow-left"></i> Каталог</button>
@@ -113,12 +117,14 @@
             </div>
             <button class="btn btn--primary" onclick="submitReview()">Отправить</button>
           </div>
-          <div id="no-review-msg" style="text-align:center;padding:20px;color:var(--muted)"><p>💡 Чтобы оставить отзыв, сначала купите этот товар</p></div>
+          <div id="no-review-msg" style="text-align:center;padding:20px;color:var(--muted)">
+            <p>💡 Чтобы оставить отзыв, сначала купите этот товар</p>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- CART -->
+    <!-- 4. CART PAGE -->
     <section id="cart" class="page">
       <div class="container">
         <h1 class="page-title">Корзина</h1>
@@ -140,7 +146,7 @@
       </div>
     </section>
 
-    <!-- PROFILE (НЕ ТРОГАЕМ ЛОГИКУ, ТОЛЬКО СТИЛИ) -->
+    <!-- 5. PROFILE PAGE -->
     <section id="profile" class="page">
       <div class="profile-header">
         <div class="avatar-wrap"><div class="avatar">👤</div></div>
@@ -154,20 +160,47 @@
           <div class="stat"><span id="user-lvl">0</span><small>Уровень</small></div>
           <div class="stat"><span id="user-discount">0</span><small>Скидка</small></div>
         </div>
+        
         <div class="level-bar">
           <div class="track"><div class="fill" id="lvl-progress" style="width:0%"></div></div>
           <span id="progress-text">До следующего уровня: 1 заказ</span>
         </div>
+
         <div class="settings-card" id="settings-card" style="display:none">
           <h3>Настройки профиля</h3>
           <div class="input-group"><input type="text" id="username-input" placeholder="Ваше имя" class="input"></div>
           <button class="btn btn--primary" onclick="saveUsername()">Сохранить</button>
         </div>
+
+        <!-- MENU -->
         <div class="menu-grid">
-          <div class="menu-item" onclick="document.getElementById('settings-card').style.display='block'"><i class="fa-solid fa-user-pen"></i><span>Изменить имя</span><i class="fa-solid fa-chevron-right"></i></div>
-          <div class="menu-item"><i class="fa-solid fa-bag-shopping"></i><span>Мои заказы</span><i class="fa-solid fa-chevron-right"></i></div>
-          <div class="menu-item" onclick="openSupportChat()"><i class="fa-solid fa-headset"></i><span>Поддержка</span><i class="fa-solid fa-chevron-right"></i></div>
+          <!-- PVZ SELECTION -->
+          <div class="menu-item" onclick="openPVZModal()">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Пункт выдачи</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </div>
+          
+          <div class="menu-item" onclick="document.getElementById('settings-card').style.display='block'">
+            <i class="fa-solid fa-user-pen"></i>
+            <span>Изменить имя</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </div>
+          
+          <div class="menu-item">
+            <i class="fa-solid fa-bag-shopping"></i>
+            <span>Мои заказы</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </div>
+          
+          <div class="menu-item" onclick="openSupportChat()">
+            <i class="fa-solid fa-headset"></i>
+            <span>Поддержка</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </div>
         </div>
+
+        <!-- AUTH FORM -->
         <div id="auth-flow">
           <div class="auth-card">
             <h3>Вход в аккаунт</h3>
@@ -183,19 +216,23 @@
             </form>
           </div>
         </div>
+        
         <div id="profile-actions" style="display:none">
           <button id="logout-btn" class="btn btn--danger full">Выйти</button>
         </div>
       </div>
     </section>
 
-    <!-- ADMIN -->
+    <!-- 6. ADMIN PAGE -->
     <section id="admin" class="page">
       <div class="container">
         <button class="back-btn" onclick="navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
         <h1>Панель управления</h1>
         <div class="admin-grid">
-          <div class="admin-card"><h3>Заказы</h3><div id="orders-list-admin" class="orders-list"></div></div>
+          <div class="admin-card">
+            <h3>Заказы</h3>
+            <div id="orders-list-admin" class="orders-list"></div>
+          </div>
           <div class="admin-card">
             <h3>Действия</h3>
             <button class="btn btn--outline full" onclick="clearAllOrders()" style="margin-top:10px;color:var(--danger);border-color:var(--danger)">🗑 Очистить</button>
@@ -204,9 +241,10 @@
         </div>
       </div>
     </section>
+
   </main>
 
-  <!-- BOTTOM NAV -->
+  <!-- === BOTTOM NAVIGATION === -->
   <nav class="bottom-nav">
     <button class="nav-item active" data-target="home"><i class="fa-solid fa-house"></i><span>Главная</span></button>
     <button class="nav-item" data-target="catalog"><i class="fa-solid fa-store"></i><span>Каталог</span></button>
@@ -214,15 +252,43 @@
     <button class="nav-item" data-target="profile"><i class="fa-regular fa-user"></i><span>Профиль</span></button>
   </nav>
 
-  <!-- MODALS -->
-  <div id="support-modal" class="modal" style="display:none">
-    <div class="modal-box">
-      <div class="modal-head"><h3>Поддержка</h3><button onclick="closeSupportChat()">✕</button></div>
-      <div class="modal-body" id="chat-messages"><div class="msg bot">Привет! Чем помочь?</div></div>
-      <div class="modal-foot"><input type="text" id="chat-input" placeholder="Сообщение..."><button onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button></div>
+  <!-- === FULLSCREEN SUPPORT CHAT === -->
+  <div id="support-modal" class="support-fullscreen" style="display:none">
+    <div class="support-header">
+      <button onclick="closeSupportChat()" style="background:none;border:none;color:#fff;font-size:1.2rem;padding:8px">✕</button>
+      <h3 style="margin:0;color:#fff;font-size:1.1rem">Поддержка ТапкиДроп</h3>
+      <div style="width:24px"></div>
+    </div>
+    <div class="support-body" id="chat-messages">
+      <div class="msg bot">👋 Привет! Я помощник ТапкиДроп. Выберите вопрос или напишите свой. Для фото брака нажмите 📷.</div>
+    </div>
+    <div class="support-footer">
+      <button class="attach-btn" onclick="document.getElementById('chat-file').click()">📷</button>
+      <input type="file" id="chat-file" accept="image/*" style="display:none">
+      <input type="text" id="chat-input" placeholder="Сообщение..." style="flex:1;background:#f0f0f0;border:none;padding:12px;border-radius:20px;font-size:1rem">
+      <button onclick="sendChatMessage()" style="background:var(--primary);color:#fff;border:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
   </div>
 
+  <!-- === PVZ MODAL === -->
+  <div id="pvz-modal" class="pvz-modal" style="display:none">
+    <div class="pvz-content">
+      <div class="pvz-header">
+        <h3>Выберите пункт выдачи</h3>
+        <button onclick="closePVZModal()">✕</button>
+      </div>
+      <div class="pvz-map-placeholder">
+        <!-- Здесь iframe карты Wildberries или ссылка -->
+        <iframe src="https://www.wildberries.ru/services/pickup?utm_source=..." width="100%" height="100%" style="border:none" title="Map"></iframe>
+      </div>
+      <div class="pvz-actions">
+        <button class="btn btn--primary full" onclick="selectPVZManual()">📍 Я выбрал точку на карте</button>
+        <button class="btn btn--outline full" onclick="closePVZModal()">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- === TOAST === -->
   <div id="level-toast" class="toast"><div class="toast-icon">🚀</div><div><div class="toast-title">Новый уровень!</div><div class="toast-desc" id="toast-desc"></div></div></div>
 
   <script src="js/app.js"></script>
