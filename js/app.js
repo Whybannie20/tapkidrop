@@ -331,13 +331,4 @@ if(sneaker && window.innerWidth > 900){
   });
 }
 
-// === PRELOADER (FIX) ===
-setTimeout(() => {
-  const preloader = document.getElementById('preloader');
-  if(preloader) {
-    preloader.classList.add('hidden');
-    setTimeout(() => { preloader.style.display = 'none'; }, 500);
-  }
-}, 1500);
-
 updateCartUI(); updateProfileUI();
