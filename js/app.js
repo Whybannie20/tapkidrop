@@ -210,37 +210,111 @@ window.changeQty = (idx,d) => { cart[idx].qty=(cart[idx].qty||1)+d; if(cart[idx]
 window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
 window.addToCart = id => { const p=products.find(x=>x.id===id); const exist=cart.find(x=>x.id===id); if(exist)exist.qty++; else cart.push({...p,qty:1}); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
 
-// TELEGRAM & CHECKOUT
+// ==========================================
+// 🔥 TELEGRAM (FIXED & DETAILED)
+// ==========================================
 function sendTelegram(orderData) {
   if(!TG_BOT_TOKEN || !TG_ADMIN_CHAT_ID) return;
-  const text = `📦 <b>НОВЫЙ ЗАКАЗ!</b>\n👤 ${orderData.user}\n🛍️ ${orderData.items}\n📍 ПВЗ: ${orderData.pvz || 'Не указан'}\n💰 <b>${orderData.total} ₽</b>`;
+
+  // Получаем данные клиента
+  const user = auth.currentUser;
+  const userName = user ? (getUserProfile(user.email) || 'Клиент') : 'Гость';
+  const userEmail = user ? user.email : 'Нет почты';
+  
+  // Форматируем список товаров
+  let itemsText = "";
+  if(Array.isArray(orderData.cartItems)) {
+    itemsText = orderData.cartItems.map(item => `• ${item.name} (Разм: ${item.size||'?'}) — ${item.price.toLocaleString('ru')} ₽`).join('\n');
+  } else {
+    itemsText = orderData.items;
+  }
+
+  // Формируем сообщение (HTML)
+  const text = `
+🔥 <b>НОВЫЙ ЗАКАЗ #${String(orderData.id).slice(-4)}</b>
+
+👤 <b>Кто заказал:</b> ${userName}
+📧 <b>Контакты:</b> ${userEmail}
+
+🛍️ <b>Состав заказа:</b>
+${itemsText}
+
+💰 <b>ИТОГО К ОПЛАТЕ:</b> ${orderData.total} ₽
+${orderData.discount > 0 ? `🎁 <b>Скидка:</b> ${orderData.discount}%` : ''}
+
+📍 <b>Доставка (Адрес):</b>
+${orderData.address || 'Не указан'}
+
+📅 <b>Время:</b> ${new Date().toLocaleString('ru-RU')}
+  `.trim();
+
+  // Отправка
   fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({chat_id:TG_ADMIN_CHAT_ID, text, parse_mode:'HTML'})
-  }).catch(e=>console.warn('TG Err:',e));
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      chat_id: TG_ADMIN_CHAT_ID,
+      text: text,
+      parse_mode: 'HTML'
+    })
+  })
+  .then(res => console.log('✅ Telegram sent'))
+  .catch(err => console.error('❌ Telegram error:', err));
 }
+
+// CHECKOUT
 window.checkout = () => { 
   if(!auth.currentUser){navigate('profile');alert('Войдите в аккаунт');return;} 
   if(!cart.length) return;
-  const itemsList = cart.map(i=>`${i.name} (${i.size||''})`).join(', ');
+
+  // 1. Собираем данные заказа
   const sub = cart.reduce((s,i)=>s+i.price*(i.qty||1),0);
+  const rank = getRankData(orderCount);
+  const discount = Math.floor(sub*(rank.discount/100));
+  const total = sub - discount;
+
+  // 2. Адрес
   const pvzData = JSON.parse(localStorage.getItem('selectedPVZ') || '{}');
-  const pvzAddress = pvzData.city ? `${pvzData.city}, ${pvzData.district||''}, ${pvzData.address||''}`.replace(/,\s*,/g,',').trim() : 'Не указан';
-  
-  const order = {id:Date.now(), user:auth.currentUser.email, items:itemsList, total:sub.toLocaleString('ru'), pvz:pvzAddress, status:'Новый', date:new Date().toISOString()};
+  const pvzAddress = pvzData.fullAddress || (pvzData.locality ? `${pvzData.locality}, ${pvzData.address}${pvzData.details ? ', ' + pvzData.details : ''}` : 'Не указан');
+
+  // 3. Создаем объект заказа
+  const order = {
+    id: Date.now(), 
+    user: auth.currentUser.email,
+    userName: getUserProfile(auth.currentUser.email),
+    items: cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
+    cartItems: cart, // Полный массив для отправки в бота
+    total: total.toLocaleString('ru'),
+    discount: rank.discount,
+    address: pvzAddress,
+    status:'Новый', 
+    date:new Date().toISOString()
+  };
+
+  // 4. Сохраняем в историю заказов
   let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
-  allOrders.push(order); localStorage.setItem('allOrders', JSON.stringify(allOrders));
+  allOrders.push(order); 
+  localStorage.setItem('allOrders', JSON.stringify(allOrders));
   
-  cart.forEach(item => { if(!purchasedProducts.some(p=>p.id===item.id && p.user===auth.currentUser.email)) purchasedProducts.push({id:item.id, user:auth.currentUser.email, date:new Date().toISOString()}); });
+  // 5. Помечаем товары как купленные (для отзывов)
+  cart.forEach(item => { 
+    if(!purchasedProducts.some(p=>p.id===item.id && p.user===auth.currentUser.email)) 
+      purchasedProducts.push({id:item.id, user:auth.currentUser.email, date:new Date().toISOString()}); 
+  });
   localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
   
+  // 6. ОТПРАВЛЯЕМ В ТЕЛЕГРАМ (теперь точно каждый раз)
   sendTelegram(order);
+
+  // 7. UI и уровни
   orderCount++; localStorage.setItem('orderCount', orderCount);
   const nr=getRankData(orderCount), pr=getRankData(orderCount-1);
   if(nr.lvl>pr.lvl) showToast(`LVL ${nr.displayLvl}`, nr.title);
-  alert('✅ Заказ оформлен! Ожидайте сообщения.');
+  
+  alert('✅ Заказ оформлен! Данные отправлены менеджеру.');
   cart=[]; localStorage.setItem('cart','[]'); updateCartUI(); updateProfileUI();
 };
+
 function showToast(t,d){const el=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=d;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
 
 // PROFILE & ADMIN
@@ -259,10 +333,10 @@ function renderAdmin() {
   if(!auth.currentUser || auth.currentUser.email !== 'maslakov.antoni@yandex.ru') return; 
   const list=document.getElementById('orders-list-admin');
   const all=JSON.parse(localStorage.getItem('allOrders'))||[];
-  list.innerHTML=all.length?all.reverse().map(o=>`<div class="order-row"><div>#${String(o.id).slice(-4)}<br><small>${o.user}</small><br><small style="color:var(--muted)">${o.pvz||''}</small></div><div style="text-align:right"><b>${o.total} ₽</b><br><small>${o.status}</small></div></div>`).join(''):'<p style="color:var(--muted)">Заказов нет</p>';
+  list.innerHTML=all.length?all.reverse().map(o=>`<div class="order-row"><div>#${String(o.id).slice(-4)}<br><small>${o.userName||o.user}</small><br><small style="color:var(--muted)">${o.address||''}</small></div><div style="text-align:right"><b>${o.total} ₽</b><br><small>${o.status}</small></div></div>`).join(''):'<p style="color:var(--muted)">Заказов нет</p>';
 }
 window.clearAllOrders=()=>{if(confirm('Удалить историю?')){localStorage.removeItem('allOrders');renderAdmin();}};
-window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р|${o.pvz||''}`).join('\n'));alert('Скопировано!');};
+window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р|${o.address||''}`).join('\n'));alert('Скопировано!');};
 
 // AUTH
 const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
@@ -303,7 +377,7 @@ auth.onAuthStateChanged(user => {
 });
 document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
-// 🤖 SUPPORT CHAT (FULLSCREEN + PHOTOS)
+// 🤖 SUPPORT CHAT
 const faqDB = {
   'доставк|сроки|где заказ|трек|когда придёт|статус': '🚚 Доставка по РФ: 1-3 дня. Бесплатно от 5000₽. Трек-номер придет в SMS сразу после отправки.',
   'возврат|вернуть|деньги назад|отказ|не понравил': '↩️ Возврат в течение 14 дней, если не носили и сохранили вид/бирки. Курьер заберет бесплатно.',
@@ -316,7 +390,7 @@ const faqDB = {
   'грязь|чистка|уход|подошва|стирк|вода|пятн': '🧼 Рекомендуем специальную пену для кроссовок. Не стирайте в машинке.',
   'подарок|упаковк|коробк|состояни|нов|следы носк': '🎁 Доставка в фирменной коробке. По запросу добавим подарочный пакет (+199₽).'
 };
-const quickReplies = ["📦 Где мой заказ?","↩️ Как вернуть?","📏 Подбор размера","💳 Оплата","🏷️ Промокод","👟 Качество/Брак","🔄 Обмен","🧼 Уход","👨‍💼 Оператор"];
+const quickReplies = ["📦 Где мой заказ?","↩️ Как вернуть?","📏 Подбор размера","💳 Оплата","️ Промокод","👟 Качество/Брак","🔄 Обмен","🧼 Уход","👨‍ Оператор"];
 
 window.openSupportChat = () => {
   document.getElementById('support-modal').style.display = 'flex';
@@ -337,12 +411,10 @@ function renderQuickReplies() {
   });
   chatBox.appendChild(container);
 }
-
 window.sendChatMessage = () => {
   const input = document.getElementById('chat-input'); const text = input.value.trim(); if(!text) return;
   input.value = ''; handleChatInput(text);
 };
-
 function handleChatInput(text) {
   const chatBox = document.getElementById('chat-messages');
   const qr = chatBox.querySelector('.quick-replies'); if(qr) qr.remove();
@@ -374,7 +446,7 @@ document.getElementById('chat-file')?.addEventListener('change', function(e) {
   this.value = '';
 });
 
-// 📍 PVZ SELECTOR (UNIVERSAL - VILLAGES/TOWNS/CITIES)
+// 📍 PVZ SELECTOR (MANUAL INPUT)
 window.openPVZModal = () => {
   const modal = document.getElementById('pvz-modal');
   const content = modal.querySelector('.pvz-content');
@@ -390,7 +462,7 @@ window.openPVZModal = () => {
         <small>Примеры: Москва, с. Красное, д. Ивановка, СНТ "Ромашка", г. Екатеринбург, ЖК "Северный"</small>
       </p>
       
-      <input type="text" id="pvz-locality" placeholder="Населённый пункт *" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-locality" placeholder="Населённый пункт (Город/Село/Деревня) *" class="input" style="margin-bottom:10px">
       <input type="text" id="pvz-address" placeholder="Улица, дом, офис, ПВЗ *" class="input" style="margin-bottom:10px">
       <input type="text" id="pvz-details" placeholder="Детали (подъезд, этаж, код, ориентир)" class="input" style="margin-bottom:20px">
       
@@ -441,38 +513,6 @@ function loadSavedPVZ() {
     if(pvzBtn) {
       const short = pvz.fullAddress || [pvz.locality, pvz.address].filter(Boolean).join(', ');
       pvzBtn.innerHTML = `<i class="fa-solid fa-location-dot"></i><span>📍 ${short.slice(0, 22)}${short.length>22?'...':''}</span><i class="fa-solid fa-check" style="color:var(--success)"></i>`;
-    }
-  }
-}
-window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
-
-window.savePVZManual = () => {
-  const city = document.getElementById('pvz-city').value.trim();
-  const district = document.getElementById('pvz-district').value.trim();
-  const address = document.getElementById('pvz-address').value.trim();
-  const comment = document.getElementById('pvz-comment').value.trim();
-  
-  if(!city || !address) {
-    alert('⚠️ Пожалуйста, заполните Город и Адрес');
-    return;
-  }
-  
-  const pvzData = { city, district, address, comment, savedAt: new Date().toISOString() };
-  localStorage.setItem('selectedPVZ', JSON.stringify(pvzData));
-  
-  alert('✅ Адрес сохранён! Он будет использован при оформлении заказа.');
-  closePVZModal();
-  loadSavedPVZ();
-};
-
-function loadSavedPVZ() {
-  const saved = localStorage.getItem('selectedPVZ');
-  if(saved) {
-    const pvz = JSON.parse(saved);
-    const pvzBtn = document.querySelector('.menu-item[onclick="openPVZModal()"]');
-    if(pvzBtn) {
-      const shortAddr = [pvz.city, pvz.district, pvz.address].filter(Boolean).join(', ').slice(0, 25);
-      pvzBtn.innerHTML = `<i class="fa-solid fa-location-dot"></i><span>ПВЗ: ${shortAddr}${shortAddr.length>=25?'...':''}</span><i class="fa-solid fa-check" style="color:var(--success)"></i>`;
     }
   }
 }
