@@ -200,3 +200,13 @@ a { text-decoration: none; color: inherit; }
 .pvz-header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
 .pvz-map-placeholder{flex:1;background:#eee;position:relative}
 .pvz-actions{padding:16px;display:flex;flex-direction:column;gap:10px;background:#fff}
+/* PVZ STYLES */
+.pvz-search{padding:16px;display:flex;gap:8px}
+.pvz-search .input{flex:1}
+.pvz-list{padding:0 16px}
+.pvz-item{background:#f8f8f8;border:2px solid transparent;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:0.2s}
+.pvz-item:hover{border-color:var(--primary);background:#fff}
+.pvz-item.selected{border-color:var(--primary);background:#e8f0ff}
+.pvz-item h4{margin:0 0 4px;font-size:0.95rem}
+.pvz-item p{margin:0;color:var(--muted);font-size:0.85rem}
+.pvz-item .address{font-size:0.8rem;margin-top:4px}
