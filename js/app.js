@@ -374,39 +374,76 @@ document.getElementById('chat-file')?.addEventListener('change', function(e) {
   this.value = '';
 });
 
-// 📍 PVZ SELECTOR (SIMPLIFIED - MANUAL INPUT)
+// 📍 PVZ SELECTOR (UNIVERSAL - VILLAGES/TOWNS/CITIES)
 window.openPVZModal = () => {
   const modal = document.getElementById('pvz-modal');
   const content = modal.querySelector('.pvz-content');
   
-  // Build simple form
   content.innerHTML = `
     <div class="pvz-header">
-      <h3>Адрес пункта выдачи</h3>
+      <h3>Адрес доставки</h3>
       <button onclick="closePVZModal()">✕</button>
     </div>
     <div style="padding:16px">
-      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Укажите, куда доставить заказ (ПВЗ Wildberries, постамат или другой адрес)</p>
+      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">
+        Укажите, куда доставить заказ (ПВЗ, постамат, дом, офис).<br>
+        <small>Примеры: Москва, с. Красное, д. Ивановка, СНТ "Ромашка", г. Екатеринбург, ЖК "Северный"</small>
+      </p>
       
-      <input type="text" id="pvz-city" placeholder="Город *" class="input" style="margin-bottom:10px">
-      <input type="text" id="pvz-district" placeholder="Район (необязательно)" class="input" style="margin-bottom:10px">
-      <input type="text" id="pvz-address" placeholder="Улица, дом *" class="input" style="margin-bottom:10px">
-      <input type="text" id="pvz-comment" placeholder="Комментарий (этаж, код домофона)" class="input" style="margin-bottom:20px">
+      <input type="text" id="pvz-locality" placeholder="Населённый пункт *" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-address" placeholder="Улица, дом, офис, ПВЗ *" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-details" placeholder="Детали (подъезд, этаж, код, ориентир)" class="input" style="margin-bottom:20px">
       
       <button class="btn btn--primary full" onclick="savePVZManual()">💾 Сохранить адрес</button>
     </div>
   `;
   
-  // Load saved data if exists
+  // Load saved data
   const saved = JSON.parse(localStorage.getItem('selectedPVZ') || '{}');
-  if(saved.city) document.getElementById('pvz-city').value = saved.city;
-  if(saved.district) document.getElementById('pvz-district').value = saved.district;
+  if(saved.locality) document.getElementById('pvz-locality').value = saved.locality;
   if(saved.address) document.getElementById('pvz-address').value = saved.address;
-  if(saved.comment) document.getElementById('pvz-comment').value = saved.comment;
+  if(saved.details) document.getElementById('pvz-details').value = saved.details;
   
   modal.style.display = 'flex';
 };
 
+window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
+
+window.savePVZManual = () => {
+  const locality = document.getElementById('pvz-locality').value.trim();
+  const address = document.getElementById('pvz-address').value.trim();
+  const details = document.getElementById('pvz-details').value.trim();
+  
+  if(!locality || !address) {
+    alert('⚠️ Пожалуйста, заполните Населённый пункт и Адрес');
+    return;
+  }
+  
+  const pvzData = { 
+    locality, 
+    address, 
+    details, 
+    fullAddress: `${locality}, ${address}${details ? ', ' + details : ''}`,
+    savedAt: new Date().toISOString() 
+  };
+  localStorage.setItem('selectedPVZ', JSON.stringify(pvzData));
+  
+  alert('✅ Адрес сохранён! Он будет использован при оформлении заказа.');
+  closePVZModal();
+  loadSavedPVZ();
+};
+
+function loadSavedPVZ() {
+  const saved = localStorage.getItem('selectedPVZ');
+  if(saved) {
+    const pvz = JSON.parse(saved);
+    const pvzBtn = document.querySelector('.menu-item[onclick="openPVZModal()"]');
+    if(pvzBtn) {
+      const short = pvz.fullAddress || [pvz.locality, pvz.address].filter(Boolean).join(', ');
+      pvzBtn.innerHTML = `<i class="fa-solid fa-location-dot"></i><span>📍 ${short.slice(0, 22)}${short.length>22?'...':''}</span><i class="fa-solid fa-check" style="color:var(--success)"></i>`;
+    }
+  }
+}
 window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
 
 window.savePVZManual = () => {
