@@ -213,7 +213,7 @@ window.addToCart = id => { const p=products.find(x=>x.id===id); const exist=cart
 // TELEGRAM & CHECKOUT
 function sendTelegram(orderData) {
   if(!TG_BOT_TOKEN || !TG_ADMIN_CHAT_ID) return;
-  const text = `📦 <b>НОВЫЙ ЗАКАЗ!</b>\n👤 ${orderData.user}\n🛍️ ${orderData.items}\n💰 <b>${orderData.total} ₽</b>`;
+  const text = `📦 <b>НОВЫЙ ЗАКАЗ!</b>\n👤 ${orderData.user}\n🛍️ ${orderData.items}\n📍 ПВЗ: ${orderData.pvz || 'Не указан'}\n💰 <b>${orderData.total} ₽</b>`;
   fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({chat_id:TG_ADMIN_CHAT_ID, text, parse_mode:'HTML'})
@@ -224,11 +224,16 @@ window.checkout = () => {
   if(!cart.length) return;
   const itemsList = cart.map(i=>`${i.name} (${i.size||''})`).join(', ');
   const sub = cart.reduce((s,i)=>s+i.price*(i.qty||1),0);
-  const order = {id:Date.now(), user:auth.currentUser.email, items:itemsList, total:sub.toLocaleString('ru'), status:'Новый', date:new Date().toISOString()};
+  const pvzData = JSON.parse(localStorage.getItem('selectedPVZ') || '{}');
+  const pvzAddress = pvzData.city ? `${pvzData.city}, ${pvzData.district||''}, ${pvzData.address||''}`.replace(/,\s*,/g,',').trim() : 'Не указан';
+  
+  const order = {id:Date.now(), user:auth.currentUser.email, items:itemsList, total:sub.toLocaleString('ru'), pvz:pvzAddress, status:'Новый', date:new Date().toISOString()};
   let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
   allOrders.push(order); localStorage.setItem('allOrders', JSON.stringify(allOrders));
+  
   cart.forEach(item => { if(!purchasedProducts.some(p=>p.id===item.id && p.user===auth.currentUser.email)) purchasedProducts.push({id:item.id, user:auth.currentUser.email, date:new Date().toISOString()}); });
   localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
+  
   sendTelegram(order);
   orderCount++; localStorage.setItem('orderCount', orderCount);
   const nr=getRankData(orderCount), pr=getRankData(orderCount-1);
@@ -248,15 +253,16 @@ const updateProfileUI = () => {
   document.getElementById('progress-text').textContent=rank.isMax?'🏆 Максимум!':`До след. уровня: ${10-rank.displayLvl} заказов`;
   document.getElementById('stat-orders').textContent=orderCount; document.getElementById('stat-bonus').textContent=orderCount*50;
   if(auth.currentUser) document.getElementById('username-input').value=name;
+  loadSavedPVZ();
 };
 function renderAdmin() {
   if(!auth.currentUser || auth.currentUser.email !== 'maslakov.antoni@yandex.ru') return; 
   const list=document.getElementById('orders-list-admin');
   const all=JSON.parse(localStorage.getItem('allOrders'))||[];
-  list.innerHTML=all.length?all.reverse().map(o=>`<div class="order-row"><div>#${String(o.id).slice(-4)}<br><small>${o.user}</small></div><div style="text-align:right"><b>${o.total} ₽</b><br><small>${o.status}</small></div></div>`).join(''):'<p style="color:var(--muted)">Заказов нет</p>';
+  list.innerHTML=all.length?all.reverse().map(o=>`<div class="order-row"><div>#${String(o.id).slice(-4)}<br><small>${o.user}</small><br><small style="color:var(--muted)">${o.pvz||''}</small></div><div style="text-align:right"><b>${o.total} ₽</b><br><small>${o.status}</small></div></div>`).join(''):'<p style="color:var(--muted)">Заказов нет</p>';
 }
 window.clearAllOrders=()=>{if(confirm('Удалить историю?')){localStorage.removeItem('allOrders');renderAdmin();}};
-window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р`).join('\n'));alert('Скопировано!');};
+window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р|${o.pvz||''}`).join('\n'));alert('Скопировано!');};
 
 // AUTH
 const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
@@ -346,7 +352,7 @@ function handleChatInput(text) {
   setTimeout(() => {
     const finalMsg = reply || '🤔 Не совсем понял вопрос. Уточните, или нажмите кнопку ниже.';
     chatBox.innerHTML += `<div class="msg bot">${finalMsg}</div>`;
-    if(!reply) chatBox.innerHTML += `<div class="quick-replies"><button class="quick-reply-btn" onclick="handleChatInput('👨‍💼 Оператор')">👨‍ Связаться с оператором</button></div>`;
+    if(!reply) chatBox.innerHTML += `<div class="quick-replies"><button class="quick-reply-btn" onclick="handleChatInput('👨‍ Оператор')">👨‍ Связаться с оператором</button></div>`;
     chatBox.scrollTop = chatBox.scrollHeight;
   }, 400);
 }
@@ -368,13 +374,71 @@ document.getElementById('chat-file')?.addEventListener('change', function(e) {
   this.value = '';
 });
 
-// 📍 PVZ MODAL
-window.openPVZModal = () => { document.getElementById('pvz-modal').style.display = 'flex'; };
-window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
-window.selectPVZManual = () => {
-  alert('✅ Пункт выдачи сохранён! Ближайший ПВЗ будет выбран автоматически при оформлении.');
-  closePVZModal();
+// 📍 PVZ SELECTOR (SIMPLIFIED - MANUAL INPUT)
+window.openPVZModal = () => {
+  const modal = document.getElementById('pvz-modal');
+  const content = modal.querySelector('.pvz-content');
+  
+  // Build simple form
+  content.innerHTML = `
+    <div class="pvz-header">
+      <h3>Адрес пункта выдачи</h3>
+      <button onclick="closePVZModal()">✕</button>
+    </div>
+    <div style="padding:16px">
+      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Укажите, куда доставить заказ (ПВЗ Wildberries, постамат или другой адрес)</p>
+      
+      <input type="text" id="pvz-city" placeholder="Город *" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-district" placeholder="Район (необязательно)" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-address" placeholder="Улица, дом *" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-comment" placeholder="Комментарий (этаж, код домофона)" class="input" style="margin-bottom:20px">
+      
+      <button class="btn btn--primary full" onclick="savePVZManual()">💾 Сохранить адрес</button>
+    </div>
+  `;
+  
+  // Load saved data if exists
+  const saved = JSON.parse(localStorage.getItem('selectedPVZ') || '{}');
+  if(saved.city) document.getElementById('pvz-city').value = saved.city;
+  if(saved.district) document.getElementById('pvz-district').value = saved.district;
+  if(saved.address) document.getElementById('pvz-address').value = saved.address;
+  if(saved.comment) document.getElementById('pvz-comment').value = saved.comment;
+  
+  modal.style.display = 'flex';
 };
+
+window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
+
+window.savePVZManual = () => {
+  const city = document.getElementById('pvz-city').value.trim();
+  const district = document.getElementById('pvz-district').value.trim();
+  const address = document.getElementById('pvz-address').value.trim();
+  const comment = document.getElementById('pvz-comment').value.trim();
+  
+  if(!city || !address) {
+    alert('⚠️ Пожалуйста, заполните Город и Адрес');
+    return;
+  }
+  
+  const pvzData = { city, district, address, comment, savedAt: new Date().toISOString() };
+  localStorage.setItem('selectedPVZ', JSON.stringify(pvzData));
+  
+  alert('✅ Адрес сохранён! Он будет использован при оформлении заказа.');
+  closePVZModal();
+  loadSavedPVZ();
+};
+
+function loadSavedPVZ() {
+  const saved = localStorage.getItem('selectedPVZ');
+  if(saved) {
+    const pvz = JSON.parse(saved);
+    const pvzBtn = document.querySelector('.menu-item[onclick="openPVZModal()"]');
+    if(pvzBtn) {
+      const shortAddr = [pvz.city, pvz.district, pvz.address].filter(Boolean).join(', ').slice(0, 25);
+      pvzBtn.innerHTML = `<i class="fa-solid fa-location-dot"></i><span>ПВЗ: ${shortAddr}${shortAddr.length>=25?'...':''}</span><i class="fa-solid fa-check" style="color:var(--success)"></i>`;
+    }
+  }
+}
 
 // PWA
 if('serviceWorker' in navigator) {
@@ -385,4 +449,7 @@ const installBtn = document.getElementById('install-btn');
 if(installBtn) window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'flex'; });
 window.installApp = () => { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt=null; installBtn.style.display='none'; }); } };
 
-updateCartUI(); updateProfileUI();
+// INIT
+updateCartUI();
+updateProfileUI();
+loadSavedPVZ();
