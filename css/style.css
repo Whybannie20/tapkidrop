@@ -220,3 +220,12 @@ a { text-decoration: none; color: inherit; }
 
 /* ADMIN ORDER ROWS */
 .order-row { background: var(--card); padding: 12px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: start; border: 1px solid var(--border); }
+/* ADMIN STATS */
+.admin-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}
+.stat-box{background:var(--card);padding:12px;border-radius:10px;text-align:center;border:1px solid var(--border)}
+.stat-num{display:block;font-size:1.3rem;font-weight:700;color:var(--primary)}
+.stat-box small{color:var(--muted);font-size:0.75rem}
+
+/* CATEGORY BUTTONS */
+.cat-btn{background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:6px 10px;border-radius:20px;cursor:pointer;margin-right:6px;font-size:0.85rem;white-space:nowrap}
+.cat-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}

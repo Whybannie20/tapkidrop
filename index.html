@@ -33,6 +33,18 @@
     </div>
   </header>
 
+  <!-- === CATEGORIES NAV (STYLES INSTEAD OF BRANDS) === -->
+  <nav class="categories-nav">
+    <div class="container">
+      <button class="cat-btn active" data-cat="all">🔍 Все</button>
+      <button class="cat-btn" data-cat="designer">✨ Дизайнерские</button>
+      <button class="cat-btn" data-cat="kids">🧒 Детские</button>
+      <button class="cat-btn" data-cat="swag">🔥 Сваг</button>
+      <button class="cat-btn" data-cat="classics">👟 Классика</button>
+      <button class="cat-btn" data-cat="sale">🏷️ Распродажа</button>
+    </div>
+  </nav>
+
   <!-- === MAIN CONTENT === -->
   <main class="app-main">
     
@@ -65,13 +77,6 @@
     <!-- 2. CATALOG PAGE -->
     <section id="catalog" class="page">
       <div class="container">
-        <div class="filter-bar">
-          <button class="filter-btn active" data-cat="all">Все</button>
-          <button class="filter-btn" data-cat="nike">Nike</button>
-          <button class="filter-btn" data-cat="adidas">Adidas</button>
-          <button class="filter-btn" data-cat="newbalance">New Balance</button>
-          <button class="filter-btn" data-cat="local">Локальные</button>
-        </div>
         <div class="grid" id="catalog-grid"></div>
       </div>
     </section>

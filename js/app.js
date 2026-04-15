@@ -23,14 +23,26 @@ let currentProductId = null;
 let selectedSize = null;
 let selectedPhotos = [];
 
-// DATA
+// === PRODUCTS WITH CATEGORIES (NOT BRANDS) ===
 const products = [
-  {id:1,brand:'nike',name:'Air Max 97 Silver',price:14990,desc:'Культовая модель с системой амортизации Air.',sizes:[39,40,41,42,43,44],rating:4.8,reviews:128},
-  {id:2,brand:'adidas',name:'Ultraboost 22',price:12990,desc:'Максимальный комфорт. Технология Boost.',sizes:[40,41,42,43],rating:4.7,reviews:94},
-  {id:3,brand:'newbalance',name:'550 White Green',price:11990,desc:'Ретро-силуэт. Натуральная кожа.',sizes:[41,42,43,44],rating:4.9,reviews:215},
-  {id:4,brand:'local',name:'Street Runner V3',price:4990,desc:'Локальный бренд. Легкие и дышащие.',sizes:[38,39,40,41,42],rating:4.5,reviews:42},
-  {id:5,brand:'nike',name:'Dunk Low Retro',price:13490,desc:'Классика стритвира.',sizes:[39,40,41,42,43],rating:4.8,reviews:156},
-  {id:6,brand:'adidas',name:'Forum Low',price:10990,desc:'Винтажный баскетбольный стиль.',sizes:[40,41,42],rating:4.6,reviews:78}
+  {id:1,category:'designer',name:'Air Max 97 Silver',price:14990,desc:'Культовая модель с системой амортизации Air.',sizes:[39,40,41,42,43,44],rating:4.8,reviews:128},
+  {id:2,category:'swag',name:'Ultraboost 22',price:12990,desc:'Максимальный комфорт. Технология Boost.',sizes:[40,41,42,43],rating:4.7,reviews:94},
+  {id:3,category:'kids',name:'550 White Green (Kids)',price:8990,desc:'Детская версия ретро-силуэта.',sizes:[31,32,33,34,35,36],rating:4.9,reviews:215},
+  {id:4,category:'classics',name:'Street Runner V3',price:4990,desc:'Локальный бренд. Легкие и дышащие.',sizes:[38,39,40,41,42],rating:4.5,reviews:42},
+  {id:5,category:'designer',name:'Dunk Low Retro',price:13490,desc:'Классика стритвира.',sizes:[39,40,41,42,43],rating:4.8,reviews:156},
+  {id:6,category:'sale',name:'Forum Low (Sale)',price:7990,desc:'Винтажный стиль по акции.',sizes:[40,41,42],rating:4.6,reviews:78},
+  {id:7,category:'kids',name:'Junior Air Force 1',price:6990,desc:'Детские кроссовки на каждый день.',sizes:[28,29,30,31,32],rating:4.7,reviews:89},
+  {id:8,category:'swag',name:'Yeezy Style 350',price:15990,desc:'Уличный стиль премиум-класса.',sizes:[40,41,42,43,44],rating:4.9,reviews:203}
+];
+
+// CATEGORIES CONFIG
+const categories = [
+  {id:'all',name:'Все',icon:'🔍'},
+  {id:'designer',name:'Дизайнерские',icon:'✨'},
+  {id:'kids',name:'Детские',icon:'🧒'},
+  {id:'swag',name:'Сваг/Стрит',icon:'🔥'},
+  {id:'classics',name:'Классика',icon:'👟'},
+  {id:'sale',name:'Распродажа',icon:'🏷️'}
 ];
 
 // REVIEWS & PROFILES
@@ -82,10 +94,10 @@ const createCard = p => `
   <div class="card" onclick="openProduct(${p.id})">
     <div class="card-img">👟<button class="card-fav" onclick="event.stopPropagation(); this.innerHTML=this.innerHTML.includes('solid')?'<i class=\\'fa-regular fa-heart\\'></i>':'<i class=\\'fa-solid fa-heart\\' style=color:red></i>'"><i class="fa-regular fa-heart"></i></button></div>
     <div class="card-body">
-      <div class="card-brand">${p.brand}</div>
+      <div class="card-brand">${categories.find(c=>c.id===p.category)?.name || p.category}</div>
       <div class="card-name">${p.name}</div>
       <div class="card-rating">⭐ ${p.rating} <span>(${p.reviews})</span></div>
-      <div class="card-price"><span class="now">${p.price.toLocaleString('ru')} ₽</span><span class="old">${Math.round(p.price*1.2).toLocaleString('ru')} ₽</span></div>
+      <div class="card-price"><span class="now">${p.price.toLocaleString('ru')} ₽</span>${p.category==='sale'?'<span class="old">'+Math.round(p.price*1.3).toLocaleString('ru')+' ₽</span>':''}</div>
       <div class="card-actions"><button class="btn-cart" onclick="event.stopPropagation(); addToCart(${p.id})">В корзину</button></div>
     </div>
   </div>`;
@@ -93,29 +105,31 @@ const renderGrid = (id, list) => { const el = document.getElementById(id); if(el
 
 // INIT CATALOGS
 renderGrid('home-grid', products.slice(0,4));
-renderGrid('new-grid', products.slice(2,6));
+renderGrid('new-grid', products.slice(4,8));
 renderGrid('catalog-grid', products);
 
-// FILTERS & SEARCH
+// CATEGORY FILTERS
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const cat = btn.dataset.cat;
-    renderGrid('catalog-grid', cat === 'all' ? products : products.filter(p => p.brand === cat));
+    renderGrid('catalog-grid', cat === 'all' ? products : products.filter(p => p.category === cat));
   };
 });
+
+// SEARCH
 const searchInput = document.getElementById('search-input');
 if(searchInput) searchInput.addEventListener('input', e => {
   const q = e.target.value.toLowerCase();
-  renderGrid('catalog-grid', products.filter(p => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q)));
+  renderGrid('catalog-grid', products.filter(p => p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)));
 });
 
 // PRODUCT DETAIL
 window.openProduct = id => {
   currentProductId = id; selectedSize = null;
   const p = products.find(x => x.id === id); if(!p) return;
-  document.getElementById('detail-brand').textContent = p.brand;
+  document.getElementById('detail-brand').textContent = categories.find(c=>c.id===p.category)?.name || p.category;
   document.getElementById('detail-name').textContent = p.name;
   document.getElementById('detail-price').textContent = p.price.toLocaleString('ru') + ' ₽';
   document.getElementById('sizes-container').innerHTML = p.sizes.map(s => `<button class="size-btn" onclick="selectSize(this, ${s})">${s}</button>`).join('');
@@ -211,9 +225,7 @@ window.changeQty = (idx,d) => { cart[idx].qty=(cart[idx].qty||1)+d; if(cart[idx]
 window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
 window.addToCart = id => { const p=products.find(x=>x.id===id); const exist=cart.find(x=>x.id===id); if(exist)exist.qty++; else cart.push({...p,qty:1}); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
 
-// ==========================================
 // TELEGRAM & CHECKOUT
-// ==========================================
 function sendTelegram(orderData) {
   if(!TG_BOT_TOKEN || !TG_ADMIN_CHAT_ID) return;
   const text = `📦 <b>НОВЫЙ ЗАКАЗ #${String(orderData.id).slice(-4)}</b>\n👤 ${orderData.user}\n🛍️ ${orderData.items}\n📍 ${orderData.address}\n💰 <b>${orderData.total} ₽</b>`;
@@ -237,7 +249,7 @@ window.checkout = () => {
     items: cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
     total: sub.toLocaleString('ru'), 
     address: pvzAddress, 
-    status: 'new', // new -> assembling -> shipping -> delivered
+    status: 'new',
     date: new Date().toISOString()
   };
   
@@ -270,7 +282,7 @@ const updateProfileUI = () => {
   loadSavedPVZ();
 };
 
-// === ORDERS RENDERING (CLIENT) ===
+// === MY ORDERS (CLIENT) ===
 window.renderMyOrders = () => {
   if(!auth.currentUser) return;
   const container = document.getElementById('my-orders-list');
@@ -285,27 +297,19 @@ window.renderMyOrders = () => {
   }
   
   container.innerHTML = myOrders.map(o => {
-    let statusText = '';
-    let statusColor = '';
-    let reviewBtn = '';
-    
+    let statusText = '', statusColor = '', reviewBtn = '';
     switch(o.status) {
       case 'new': statusText='В обработке'; statusColor='orange'; break;
       case 'assembling': statusText='В сборке'; statusColor='#005bff'; break;
-      case 'shipping': statusText='В пути (на ПВЗ)'; statusColor='#00b341'; break;
-      case 'delivered': statusText='Доставлен'; statusColor='#111'; 
-        // Check if already reviewed
+      case 'shipping': statusText='В пути'; statusColor='#00b341'; break;
+      case 'delivered': statusText='Доставлен'; statusColor='#111';
         const reviewed = (allReviews[o.id]||[]).some(r=>r.user===auth.currentUser.email);
-        if(!reviewed) reviewBtn = `<button class="btn btn--outline" style="margin-top:8px;font-size:0.8rem;padding:6px" onclick="openProduct(${o.items.split(' ')[0]?.match(/\d+/)?.[0]} || 1)">Оставить отзыв</button>`;
+        if(!reviewed) reviewBtn = `<button class="btn btn--outline" style="margin-top:8px;font-size:0.8rem;padding:6px" onclick="openProduct(1)">Оставить отзыв</button>`;
         break;
     }
-    
     return `
     <div class="order-card">
-      <div class="order-head">
-        <span>Заказ #${String(o.id).slice(-4)}</span>
-        <span style="font-weight:700;color:${statusColor}">${statusText}</span>
-      </div>
+      <div class="order-head"><span>Заказ #${String(o.id).slice(-4)}</span><span style="font-weight:700;color:${statusColor}">${statusText}</span></div>
       <div class="order-body">
         <div class="order-items">${o.items}</div>
         <div class="order-addr">📍 ${o.address}</div>
@@ -316,35 +320,56 @@ window.renderMyOrders = () => {
   }).join('');
 };
 
-// === ADMIN ORDERS (STATUS CHANGE) ===
+// === ADMIN PANEL (EXPANDED) ===
 function renderAdmin() {
   if(!auth.currentUser || auth.currentUser.email !== 'antoniobandero11@gmail.com') return; 
-  const list=document.getElementById('orders-list-admin');
-  const all=JSON.parse(localStorage.getItem('allOrders'))||[];
+  const container = document.getElementById('orders-list-admin');
+  if(!container) return;
   
-  if(all.length===0) {
-    list.innerHTML = '<p style="color:var(--muted)">Заказов нет</p>';
-    return;
-  }
-
-  list.innerHTML = all.reverse().map(o => {
-    const btnClass = (s) => `padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};cursor:pointer;font-size:0.75rem;margin-right:4px`;
-    return `
-    <div class="order-row">
-      <div style="flex:1">
-        <div style="font-weight:700">#${String(o.id).slice(-4)} | ${o.user}</div>
-        <div style="font-size:0.85rem;color:var(--muted)">${o.items}</div>
-        <div style="font-size:0.8rem;color:var(--muted)">📍 ${o.address}</div>
-        <div style="margin-top:6px">
-          <button class="${btnClass('new')}" onclick="updateOrderStatus(${o.id},'new')">Новый</button>
-          <button class="${btnClass('assembling')}" onclick="updateOrderStatus(${o.id},'assembling')">Сборка</button>
-          <button class="${btnClass('shipping')}" onclick="updateOrderStatus(${o.id},'shipping')">Отправлен</button>
-          <button class="${btnClass('delivered')}" onclick="updateOrderStatus(${o.id},'delivered')">Доставлен</button>
+  const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+  const allUsers = [...new Set(allOrders.map(o => o.user))];
+  
+  // Stats
+  const totalRevenue = allOrders.reduce((sum,o)=>sum+parseFloat(o.total.replace(/\s|₽/g,'')),0);
+  const todayOrders = allOrders.filter(o => new Date(o.date).toDateString() === new Date().toDateString()).length;
+  
+  container.innerHTML = `
+    <div class="admin-stats">
+      <div class="stat-box"><span class="stat-num">${allOrders.length}</span><small>Всего заказов</small></div>
+      <div class="stat-box"><span class="stat-num">${totalRevenue.toLocaleString('ru')} ₽</span><small>Выручка</small></div>
+      <div class="stat-box"><span class="stat-num">${allUsers.length}</span><small>Клиентов</small></div>
+      <div class="stat-box"><span class="stat-num">${todayOrders}</span><small>Сегодня</small></div>
+    </div>
+    
+    <div style="margin:16px 0;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn--outline" onclick="exportOrdersCSV()">📊 Экспорт CSV</button>
+      <button class="btn btn--outline" onclick="exportOrdersJSON()">📄 Экспорт JSON</button>
+      <button class="btn btn--outline" onclick="clearAllOrders()" style="color:var(--danger);border-color:var(--danger)">🗑 Очистить всё</button>
+    </div>
+    
+    <div style="margin-bottom:12px;font-weight:600">Пользователи:</div>
+    <div style="margin-bottom:16px;max-height:120px;overflow-y:auto;background:var(--surface);border-radius:8px;padding:8px">
+      ${allUsers.map(u => `<div style="font-size:0.85rem;padding:4px 0;border-bottom:1px solid var(--border)">${u}</div>`).join('') || '<span style="color:var(--muted)">Нет пользователей</span>'}
+    </div>
+    
+    <div style="margin-bottom:12px;font-weight:600">Заказы:</div>
+    ${allOrders.length===0 ? '<p style="color:var(--muted)">Заказов нет</p>' : 
+    allOrders.reverse().map(o => {
+      const btn = (s,txt) => `<button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};cursor:pointer;font-size:0.7rem;margin-right:4px" onclick="updateOrderStatus(${o.id},'${s}')">${txt}</button>`;
+      return `
+      <div class="order-row">
+        <div style="flex:1">
+          <div style="font-weight:700">#${String(o.id).slice(-4)} | ${o.user.split('@')[0]}</div>
+          <div style="font-size:0.85rem;color:var(--muted)">${o.items}</div>
+          <div style="font-size:0.8rem;color:var(--muted)">📍 ${o.address}</div>
+          <div style="margin-top:6px">
+            ${btn('new','Новый')}${btn('assembling','Сборка')}${btn('shipping','Отправлен')}${btn('delivered','Доставлен')}
+          </div>
         </div>
-      </div>
-      <div style="text-align:right"><b>${o.total} ₽</b></div>
-    </div>`;
-  }).join('');
+        <div style="text-align:right"><b>${o.total} ₽</b><br><small style="color:var(--muted)">${new Date(o.date).toLocaleDateString('ru')}</small></div>
+      </div>`;
+    }).join('')}
+  `;
 }
 
 window.updateOrderStatus = (id, status) => {
@@ -354,11 +379,32 @@ window.updateOrderStatus = (id, status) => {
     order.status = status;
     localStorage.setItem('allOrders', JSON.stringify(allOrders));
     renderAdmin();
+    // Notify client via Telegram (optional)
+    if(status === 'delivered') {
+      sendTelegram({id, user:order.user, items:'✅ Ваш заказ доставлен!', total:'', address:'', status});
+    }
   }
 };
 
-window.clearAllOrders=()=>{if(confirm('Удалить историю?')){localStorage.removeItem('allOrders');renderAdmin();}};
-window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р|${o.address||''}`).join('\n'));alert('Скопировано!');};
+window.exportOrdersCSV = () => {
+  const all = JSON.parse(localStorage.getItem('allOrders'))||[];
+  if(!all.length) return alert('Нет заказов');
+  const csv = 'ID,User,Items,Total,Address,Status,Date\n' + 
+    all.map(o => `${o.id},"${o.user}","${o.items}",${o.total},"${o.address}",${o.status},${o.date}`).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `orders-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+};
+
+window.exportOrdersJSON = () => {
+  const all = JSON.parse(localStorage.getItem('allOrders'))||[];
+  if(!all.length) return alert('Нет заказов');
+  const blob = new Blob([JSON.stringify(all,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `orders-${new Date().toISOString().slice(0,10)}.json`; a.click();
+};
+
+window.clearAllOrders=()=>{if(confirm('Удалить ВСЮ историю заказов? Это необратимо.')){localStorage.removeItem('allOrders');renderAdmin();}};
 
 // AUTH
 const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
@@ -421,7 +467,6 @@ window.openSupportChat = () => {
   renderQuickReplies();
 };
 window.closeSupportChat = () => { document.getElementById('support-modal').style.display = 'none'; };
-
 function renderQuickReplies() {
   const chatBox = document.getElementById('chat-messages');
   const old = chatBox.querySelector('.quick-replies'); if(old) old.remove();
@@ -468,35 +513,23 @@ document.getElementById('chat-file')?.addEventListener('change', function(e) {
   this.value = '';
 });
 
-// 📍 PVZ SELECTOR (MANUAL INPUT)
+// 📍 PVZ SELECTOR
 window.openPVZModal = () => {
   const modal = document.getElementById('pvz-modal');
   const content = modal.querySelector('.pvz-content');
-  
   content.innerHTML = `
-    <div class="pvz-header">
-      <h3>Адрес доставки</h3>
-      <button onclick="closePVZModal()">✕</button>
-    </div>
+    <div class="pvz-header"><h3>Адрес доставки</h3><button onclick="closePVZModal()">✕</button></div>
     <div style="padding:16px">
-      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">
-        Укажите, куда доставить заказ (ПВЗ, постамат, дом, офис).<br>
-        <small>Примеры: Москва, с. Красное, д. Ивановка, СНТ "Ромашка", г. Екатеринбург, ЖК "Северный"</small>
-      </p>
-      
-      <input type="text" id="pvz-locality" placeholder="Населённый пункт (Город/Село/Деревня) *" class="input" style="margin-bottom:10px">
-      <input type="text" id="pvz-address" placeholder="Улица, дом, офис, ПВЗ *" class="input" style="margin-bottom:10px">
-      <input type="text" id="pvz-details" placeholder="Детали (подъезд, этаж, код, ориентир)" class="input" style="margin-bottom:20px">
-      
+      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Укажите, куда доставить заказ.<br><small>Примеры: Москва, с. Красное, д. Ивановка, СНТ "Ромашка"</small></p>
+      <input type="text" id="pvz-locality" placeholder="Населённый пункт *" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-address" placeholder="Улица, дом, ПВЗ *" class="input" style="margin-bottom:10px">
+      <input type="text" id="pvz-details" placeholder="Детали (подъезд, код)" class="input" style="margin-bottom:20px">
       <button class="btn btn--primary full" onclick="savePVZManual()">💾 Сохранить адрес</button>
-    </div>
-  `;
-  
+    </div>`;
   const saved = JSON.parse(localStorage.getItem('selectedPVZ') || '{}');
   if(saved.locality) document.getElementById('pvz-locality').value = saved.locality;
   if(saved.address) document.getElementById('pvz-address').value = saved.address;
   if(saved.details) document.getElementById('pvz-details').value = saved.details;
-  
   modal.style.display = 'flex';
 };
 window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
@@ -504,10 +537,10 @@ window.savePVZManual = () => {
   const locality = document.getElementById('pvz-locality').value.trim();
   const address = document.getElementById('pvz-address').value.trim();
   const details = document.getElementById('pvz-details').value.trim();
-  if(!locality || !address) { alert('⚠️ Пожалуйста, заполните Населённый пункт и Адрес'); return; }
+  if(!locality || !address) { alert('⚠️ Заполните Населённый пункт и Адрес'); return; }
   const pvzData = { locality, address, details, fullAddress: `${locality}, ${address}${details ? ', ' + details : ''}`, savedAt: new Date().toISOString() };
   localStorage.setItem('selectedPVZ', JSON.stringify(pvzData));
-  alert('✅ Адрес сохранён! Он будет использован при оформлении заказа.');
+  alert('✅ Адрес сохранён!');
   closePVZModal(); loadSavedPVZ();
 };
 function loadSavedPVZ() {
