@@ -318,7 +318,7 @@ window.renderMyOrders = () => {
 
 // === ADMIN ORDERS (STATUS CHANGE) ===
 function renderAdmin() {
-  if(!auth.currentUser || auth.currentUser.email !== 'maslakov.antoni@yandex.ru') return; 
+  if(!auth.currentUser || auth.currentUser.email !== 'antoniobandero11@gmail.com') return; 
   const list=document.getElementById('orders-list-admin');
   const all=JSON.parse(localStorage.getItem('allOrders'))||[];
   
@@ -381,7 +381,7 @@ auth.onAuthStateChanged(user => {
     document.getElementById('profile-actions').style.display='block';
     document.getElementById('settings-card').style.display='block';
     document.getElementById('profile-email').textContent=user.email;
-    if(user.email==='maslakov.antoni@yandex.ru' && !document.getElementById('admin-link')){
+    if(user.email==='antoniobandero11@gmail.com' && !document.getElementById('admin-link')){
       document.querySelector('.menu-grid').innerHTML+=`<div class="menu-item" id="admin-link" onclick="navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админ-панель</span><i class="fa-solid fa-chevron-right"></i></div>`;
     }
     renderAdmin();
