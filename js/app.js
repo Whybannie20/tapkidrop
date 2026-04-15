@@ -15,6 +15,10 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 const TG_BOT_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
 const TG_ADMIN_CHAT_ID = "-1003371505343";
 
+// === ADMIN EMAILS ===
+const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
+const isAdmin = (email) => ADMIN_EMAILS.includes(email);
+
 // STATE
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
@@ -23,7 +27,7 @@ let currentProductId = null;
 let selectedSize = null;
 let selectedPhotos = [];
 
-// === PRODUCTS WITH CATEGORIES (NOT BRANDS) ===
+// === PRODUCTS WITH CATEGORIES ===
 const products = [
   {id:1,category:'designer',name:'Air Max 97 Silver',price:14990,desc:'Культовая модель с системой амортизации Air.',sizes:[39,40,41,42,43,44],rating:4.8,reviews:128},
   {id:2,category:'swag',name:'Ultraboost 22',price:12990,desc:'Максимальный комфорт. Технология Boost.',sizes:[40,41,42,43],rating:4.7,reviews:94},
@@ -35,7 +39,6 @@ const products = [
   {id:8,category:'swag',name:'Yeezy Style 350',price:15990,desc:'Уличный стиль премиум-класса.',sizes:[40,41,42,43,44],rating:4.9,reviews:203}
 ];
 
-// CATEGORIES CONFIG
 const categories = [
   {id:'all',name:'Все',icon:'🔍'},
   {id:'designer',name:'Дизайнерские',icon:'✨'},
@@ -250,6 +253,7 @@ window.checkout = () => {
     total: sub.toLocaleString('ru'), 
     address: pvzAddress, 
     status: 'new',
+    qrCode: '', // Поле для ссылки на картинку с кодом
     date: new Date().toISOString()
   };
   
@@ -282,7 +286,7 @@ const updateProfileUI = () => {
   loadSavedPVZ();
 };
 
-// === MY ORDERS (CLIENT) ===
+// === MY ORDERS (CLIENT) - SHOW QR IMAGE ===
 window.renderMyOrders = () => {
   if(!auth.currentUser) return;
   const container = document.getElementById('my-orders-list');
@@ -297,14 +301,22 @@ window.renderMyOrders = () => {
   }
   
   container.innerHTML = myOrders.map(o => {
-    let statusText = '', statusColor = '', reviewBtn = '';
+    let statusText = '', statusColor = '', qrBlock = '';
     switch(o.status) {
       case 'new': statusText='В обработке'; statusColor='orange'; break;
       case 'assembling': statusText='В сборке'; statusColor='#005bff'; break;
       case 'shipping': statusText='В пути'; statusColor='#00b341'; break;
-      case 'delivered': statusText='Доставлен'; statusColor='#111';
-        const reviewed = (allReviews[o.id]||[]).some(r=>r.user===auth.currentUser.email);
-        if(!reviewed) reviewBtn = `<button class="btn btn--outline" style="margin-top:8px;font-size:0.8rem;padding:6px" onclick="openProduct(1)">Оставить отзыв</button>`;
+      case 'delivered': 
+        statusText='Доставлен'; statusColor='#111';
+        // Если админ прикрепил ссылку на код, показываем её
+        if(o.qrCode) {
+          qrBlock = `
+            <div style="margin-top:12px;padding:12px;background:#f0f7ff;border-radius:8px;text-align:center">
+              <p style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">📱 Код для получения на ПВЗ:</p>
+              <img src="${o.qrCode}" alt="QR Code" style="max-width:100%;height:auto;border-radius:8px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+              <p style="font-size:0.75rem;color:var(--muted);margin-top:6px">Покажите этот код сотруднику пункта выдачи</p>
+            </div>`;
+        }
         break;
     }
     return `
@@ -315,21 +327,22 @@ window.renderMyOrders = () => {
         <div class="order-addr">📍 ${o.address}</div>
         <div class="order-sum">${o.total} ₽</div>
       </div>
-      ${reviewBtn}
+      ${qrBlock}
     </div>`;
   }).join('');
 };
 
-// === ADMIN PANEL (EXPANDED) ===
+// === ADMIN PANEL - ADD QR LINK ===
 function renderAdmin() {
-  if(!auth.currentUser || auth.currentUser.email !== 'antoniobandero11@gmail.com') return; 
+  // Проверка на любого из админов
+  if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return; 
+  
   const container = document.getElementById('orders-list-admin');
   if(!container) return;
   
   const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
   const allUsers = [...new Set(allOrders.map(o => o.user))];
   
-  // Stats
   const totalRevenue = allOrders.reduce((sum,o)=>sum+parseFloat(o.total.replace(/\s|₽/g,'')),0);
   const todayOrders = allOrders.filter(o => new Date(o.date).toDateString() === new Date().toDateString()).length;
   
@@ -356,22 +369,32 @@ function renderAdmin() {
     ${allOrders.length===0 ? '<p style="color:var(--muted)">Заказов нет</p>' : 
     allOrders.reverse().map(o => {
       const btn = (s,txt) => `<button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};cursor:pointer;font-size:0.7rem;margin-right:4px" onclick="updateOrderStatus(${o.id},'${s}')">${txt}</button>`;
+      
+      // Поле для ввода ссылки на код (видит только админ)
+      const qrInput = `
+        <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
+          <input type="text" id="qr-input-${o.id}" placeholder="Ссылка на фото кода (WB)" value="${o.qrCode||''}" style="flex:1;min-width:150px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.75rem">
+          <button style="padding:4px 8px;background:var(--success);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem" onclick="saveOrderQR(${o.id})">💾 Код</button>
+        </div>`;
+      
       return `
       <div class="order-row">
-        <div style="flex:1">
+        <div style="flex:1;min-width:200px">
           <div style="font-weight:700">#${String(o.id).slice(-4)} | ${o.user.split('@')[0]}</div>
           <div style="font-size:0.85rem;color:var(--muted)">${o.items}</div>
           <div style="font-size:0.8rem;color:var(--muted)">📍 ${o.address}</div>
           <div style="margin-top:6px">
             ${btn('new','Новый')}${btn('assembling','Сборка')}${btn('shipping','Отправлен')}${btn('delivered','Доставлен')}
           </div>
+          ${o.status === 'delivered' ? qrInput : ''}
         </div>
-        <div style="text-align:right"><b>${o.total} ₽</b><br><small style="color:var(--muted)">${new Date(o.date).toLocaleDateString('ru')}</small></div>
+        <div style="text-align:right;min-width:100px"><b>${o.total} ₽</b><br><small style="color:var(--muted)">${new Date(o.date).toLocaleDateString('ru')}</small></div>
       </div>`;
     }).join('')}
   `;
 }
 
+// Обновление статуса заказа
 window.updateOrderStatus = (id, status) => {
   let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
   const order = allOrders.find(o => o.id === id);
@@ -379,18 +402,33 @@ window.updateOrderStatus = (id, status) => {
     order.status = status;
     localStorage.setItem('allOrders', JSON.stringify(allOrders));
     renderAdmin();
-    // Notify client via Telegram (optional)
     if(status === 'delivered') {
-      sendTelegram({id, user:order.user, items:'✅ Ваш заказ доставлен!', total:'', address:'', status});
+      sendTelegram({id, user:order.user, items:'✅ Ваш заказ доставлен! Код для получения появится в разделе "Мои заказы".', total:'', address:'', status});
     }
+  }
+};
+
+// Сохранение ссылки на код
+window.saveOrderQR = (id) => {
+  const input = document.getElementById(`qr-input-${id}`);
+  if(!input) return;
+  const qrUrl = input.value.trim();
+  
+  let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+  const order = allOrders.find(o => o.id === id);
+  if(order) {
+    order.qrCode = qrUrl;
+    localStorage.setItem('allOrders', JSON.stringify(allOrders));
+    alert('✅ Ссылка на код сохранена! Клиент увидит её в приложении.');
+    renderAdmin();
   }
 };
 
 window.exportOrdersCSV = () => {
   const all = JSON.parse(localStorage.getItem('allOrders'))||[];
   if(!all.length) return alert('Нет заказов');
-  const csv = 'ID,User,Items,Total,Address,Status,Date\n' + 
-    all.map(o => `${o.id},"${o.user}","${o.items}",${o.total},"${o.address}",${o.status},${o.date}`).join('\n');
+  const csv = 'ID,User,Items,Total,Address,Status,QR,Date\n' + 
+    all.map(o => `${o.id},"${o.user}","${o.items}",${o.total},"${o.address}",${o.status},"${o.qrCode||''}",${o.date}`).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = `orders-${new Date().toISOString().slice(0,10)}.csv`; a.click();
@@ -421,13 +459,15 @@ authForm.onsubmit=async e=>{
   catch(err) { const msgs = {'auth/user-not-found':'Пользователь не найден.','auth/wrong-password':'Неверный пароль.','auth/email-already-in-use':'Email уже занят.','auth/invalid-email':'Неверный email.','auth/weak-password':'Минимум 6 символов.'}; authErr.textContent = msgs[err.code] || err.message.replace('Firebase: ',''); authErr.style.display='block'; } 
   finally { authSub.disabled=false; authSub.textContent=isLogin?'Войти':'Создать аккаунт'; }
 };
+
 auth.onAuthStateChanged(user => {
   if(user){
     document.getElementById('auth-flow').style.display='none';
     document.getElementById('profile-actions').style.display='block';
     document.getElementById('settings-card').style.display='block';
     document.getElementById('profile-email').textContent=user.email;
-    if(user.email==='antoniobandero11@gmail.com' && !document.getElementById('admin-link')){
+    // Показываем кнопку админки, если почта в списке админов
+    if(isAdmin(user.email) && !document.getElementById('admin-link')){
       document.querySelector('.menu-grid').innerHTML+=`<div class="menu-item" id="admin-link" onclick="navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админ-панель</span><i class="fa-solid fa-chevron-right"></i></div>`;
     }
     renderAdmin();
@@ -445,7 +485,7 @@ auth.onAuthStateChanged(user => {
 });
 document.getElementById('logout-btn').onclick=()=>auth.signOut();
 
-// 🤖 SUPPORT CHAT
+// SUPPORT CHAT
 const faqDB = {
   'доставк|сроки|где заказ|трек|когда придёт|статус': '🚚 Доставка по РФ: 1-3 дня. Бесплатно от 5000₽. Трек-номер придет в SMS сразу после отправки.',
   'возврат|вернуть|деньги назад|отказ|не понравил': '↩️ Возврат в течение 14 дней, если не носили и сохранили вид/бирки. Курьер заберет бесплатно.',
