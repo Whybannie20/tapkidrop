@@ -253,7 +253,7 @@ window.checkout = () => {
     total: sub.toLocaleString('ru'), 
     address: pvzAddress, 
     status: 'new',
-    qrCode: '',
+    qrImage: '', // Base64 image data
     date: new Date().toISOString()
   };
   
@@ -286,7 +286,7 @@ const updateProfileUI = () => {
   loadSavedPVZ();
 };
 
-// === MY ORDERS (CLIENT) ===
+// === MY ORDERS (CLIENT) - SHOW UPLOADED QR IMAGE ===
 window.renderMyOrders = () => {
   if(!auth.currentUser) return;
   const container = document.getElementById('my-orders-list');
@@ -308,11 +308,12 @@ window.renderMyOrders = () => {
       case 'shipping': statusText='В пути'; statusColor='#00b341'; break;
       case 'delivered': 
         statusText='Доставлен'; statusColor='#111';
-        if(o.qrCode) {
+        // Если админ загрузил фото кода, показываем его
+        if(o.qrImage) {
           qrBlock = `
             <div style="margin-top:12px;padding:12px;background:#f0f7ff;border-radius:8px;text-align:center">
               <p style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">📱 Код для получения на ПВЗ:</p>
-              <img src="${o.qrCode}" alt="QR Code" style="max-width:100%;height:auto;border-radius:8px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+              <img src="${o.qrImage}" alt="Pickup Code" style="max-width:100%;height:auto;border-radius:8px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
               <p style="font-size:0.75rem;color:var(--muted);margin-top:6px">Покажите этот код сотруднику пункта выдачи</p>
             </div>`;
         }
@@ -331,7 +332,7 @@ window.renderMyOrders = () => {
   }).join('');
 };
 
-// === ADMIN PANEL ===
+// === ADMIN PANEL - IMAGE UPLOAD FOR QR ===
 function renderAdmin() {
   if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return; 
   const container = document.getElementById('orders-list-admin');
@@ -366,11 +367,18 @@ function renderAdmin() {
     ${allOrders.length===0 ? '<p style="color:var(--muted)">Заказов нет</p>' : 
     allOrders.reverse().map(o => {
       const btn = (s,txt) => `<button style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};cursor:pointer;font-size:0.7rem;margin-right:4px" onclick="updateOrderStatus(${o.id},'${s}')">${txt}</button>`;
-      const qrInput = `
-        <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
-          <input type="text" id="qr-input-${o.id}" placeholder="Ссылка на фото кода (WB)" value="${o.qrCode||''}" style="flex:1;min-width:150px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.75rem">
-          <button style="padding:4px 8px;background:var(--success);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem" onclick="saveOrderQR(${o.id})">💾 Код</button>
+      
+      // Кнопка загрузки фото (видит только админ, только для доставленных)
+      const qrUpload = `
+        <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="qr-file-${o.id}" accept="image/*" style="display:none" onchange="saveOrderQRImage(${o.id}, this)">
+          <label for="qr-file-${o.id}" style="padding:4px 10px;background:var(--primary);color:#fff;border-radius:4px;cursor:pointer;font-size:0.75rem;display:flex;align-items:center;gap:4px">
+            📷 Загрузить код
+          </label>
+          ${o.qrImage ? '<span style="font-size:0.75rem;color:var(--success)">✅ Код загружен</span>' : ''}
+          ${o.qrImage ? `<button style="padding:2px 6px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.7rem" onclick="clearOrderQR(${o.id})">✕</button>` : ''}
         </div>`;
+      
       return `
       <div class="order-row">
         <div style="flex:1;min-width:200px">
@@ -380,13 +388,45 @@ function renderAdmin() {
           <div style="margin-top:6px">
             ${btn('new','Новый')}${btn('assembling','Сборка')}${btn('shipping','Отправлен')}${btn('delivered','Доставлен')}
           </div>
-          ${o.status === 'delivered' ? qrInput : ''}
+          ${o.status === 'delivered' ? qrUpload : ''}
         </div>
         <div style="text-align:right;min-width:100px"><b>${o.total} ₽</b><br><small style="color:var(--muted)">${new Date(o.date).toLocaleDateString('ru')}</small></div>
       </div>`;
     }).join('')}
   `;
 }
+
+// Загрузка изображения как base64
+window.saveOrderQRImage = (id, input) => {
+  const file = input.files[0];
+  if(!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64Image = e.target.result;
+    let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+    const order = allOrders.find(o => o.id === id);
+    if(order) {
+      order.qrImage = base64Image;
+      localStorage.setItem('allOrders', JSON.stringify(allOrders));
+      alert('✅ Фото кода сохранено! Клиент увидит его в приложении.');
+      renderAdmin();
+    }
+  };
+  reader.readAsDataURL(file);
+};
+
+// Удаление загруженного кода
+window.clearOrderQR = (id) => {
+  if(!confirm('Удалить код для этого заказа?')) return;
+  let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+  const order = allOrders.find(o => o.id === id);
+  if(order) {
+    order.qrImage = '';
+    localStorage.setItem('allOrders', JSON.stringify(allOrders));
+    renderAdmin();
+  }
+};
 
 window.updateOrderStatus = (id, status) => {
   let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
@@ -401,25 +441,11 @@ window.updateOrderStatus = (id, status) => {
   }
 };
 
-window.saveOrderQR = (id) => {
-  const input = document.getElementById(`qr-input-${id}`);
-  if(!input) return;
-  const qrUrl = input.value.trim();
-  let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
-  const order = allOrders.find(o => o.id === id);
-  if(order) {
-    order.qrCode = qrUrl;
-    localStorage.setItem('allOrders', JSON.stringify(allOrders));
-    alert('✅ Ссылка на код сохранена!');
-    renderAdmin();
-  }
-};
-
 window.exportOrdersCSV = () => {
   const all = JSON.parse(localStorage.getItem('allOrders'))||[];
   if(!all.length) return alert('Нет заказов');
-  const csv = 'ID,User,Items,Total,Address,Status,QR,Date\n' + 
-    all.map(o => `${o.id},"${o.user}","${o.items}",${o.total},"${o.address}",${o.status},"${o.qrCode||''}",${o.date}`).join('\n');
+  const csv = 'ID,User,Items,Total,Address,Status,HasQR,Date\n' + 
+    all.map(o => `${o.id},"${o.user}","${o.items}",${o.total},"${o.address}",${o.status},${o.qrImage?'Yes':'No'},${o.date}`).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = `orders-${new Date().toISOString().slice(0,10)}.csv`; a.click();
@@ -435,18 +461,16 @@ window.exportOrdersJSON = () => {
 
 window.clearAllOrders=()=>{if(confirm('Удалить ВСЮ историю заказов?')){localStorage.removeItem('allOrders');renderAdmin();}};
 
-// === BOT COMMANDS IN CHAT ===
+// === BOT COMMANDS IN CHAT (FIXED) ===
 const botCommands = {
   '/stats': () => {
     if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return '🔒 Доступ только для админов';
-    
     const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
     const allUsers = [...new Set(allOrders.map(o => o.user))];
     const totalRevenue = allOrders.reduce((sum,o)=>sum+parseFloat(o.total.replace(/\s|₽/g,'')),0);
     const todayOrders = allOrders.filter(o => new Date(o.date).toDateString() === new Date().toDateString()).length;
     const statusCounts = {};
     allOrders.forEach(o => { statusCounts[o.status] = (statusCounts[o.status]||0) + 1; });
-    
     return `
 📊 <b>СТАТИСТИКА САЙТА</b>
 
@@ -468,56 +492,36 @@ const botCommands = {
 🕐 <b>Обновлено:</b> ${new Date().toLocaleString('ru')}
     `.trim();
   },
-  
   '/users': () => {
     if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return '🔒 Доступ только для админов';
     const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
     const users = [...new Set(allOrders.map(o => o.user))];
     if(users.length === 0) return '👥 Пользователей пока нет';
-    
-    return `👥 <b>Список пользователей:</b>\n\n` + 
-      users.map((u,i) => `${i+1}. ${u.split('@')[0]} (${allOrders.filter(o=>o.user===u).length} зак.)`).join('\n');
+    return `👥 <b>Список пользователей:</b>\n\n` + users.map((u,i) => `${i+1}. ${u.split('@')[0]} (${allOrders.filter(o=>o.user===u).length} зак.)`).join('\n');
   },
-  
   '/orders': () => {
     if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return '🔒 Доступ только для админов';
     const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
     if(allOrders.length === 0) return '📦 Заказов пока нет';
-    
     const recent = allOrders.slice(-5).reverse();
-    return `📦 <b>Последние 5 заказов:</b>\n\n` + 
-      recent.map(o => `• #${String(o.id).slice(-4)} | ${o.total} ₽ | ${o.status}`).join('\n');
+    return `📦 <b>Последние 5 заказов:</b>\n\n` + recent.map(o => `• #${String(o.id).slice(-4)} | ${o.total} ₽ | ${o.status}`).join('\n');
   },
-  
-  '/clear': () => {
-    if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return '🔒 Доступ только для админов';
-    return '⚠️ Для очистки данных используйте кнопку в админ-панели или введите /clear confirm';
-  },
-  
+  '/clear': () => '⚠️ Для очистки введите: <b>/clear confirm</b>',
   '/clear confirm': () => {
     if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return '🔒 Доступ только для админов';
     localStorage.removeItem('allOrders');
     localStorage.removeItem('cart');
     localStorage.removeItem('orderCount');
-    return '🗑️ <b>Все данные очищены!</b>\n\n⚠️ Перезагрузите страницу для применения изменений.';
+    return '🗑️ <b>Все данные очищены!</b>\n\n⚠️ Перезагрузите страницу.';
   },
-  
-  '/help': () => {
-    return `🤖 <b>Доступные команды:</b>\n\n` +
-      `/stats — полная статистика сайта\n` +
-      `/users — список пользователей\n` +
-      `/orders — последние заказы\n` +
-      `/clear — очистить данные (требует confirm)\n` +
-      `/help — эта справка\n\n` +
-      `<i>Команды работают только для админов</i>`;
-  }
+  '/help': () => `🤖 <b>Команды для админа:</b>\n\n/stats — статистика сайта\n/users — список клиентов\n/orders — последние заказы\n/clear confirm — очистить всё`,
 };
 
-// === SUPPORT CHAT WITH COMMANDS ===
+// === SUPPORT CHAT WITH FIXED COMMANDS ===
 window.openSupportChat = () => {
   document.getElementById('support-modal').style.display = 'flex';
   const chatBox = document.getElementById('chat-messages');
-  chatBox.innerHTML = '<div class="msg bot">👋 Привет! Я помощник ТапкиДроп. Выберите вопрос или напишите свой. Для фото брака нажмите 📷.<br><br><small>Админы: используйте /help для списка команд</small></div>';
+  chatBox.innerHTML = '<div class="msg bot">👋 Привет! Я помощник ТапкиДроп. Выберите вопрос или напишите свой.<br><br><small>Админы: введите /help для команд</small></div>';
   renderQuickReplies();
 };
 window.closeSupportChat = () => { document.getElementById('support-modal').style.display = 'none'; };
@@ -526,8 +530,7 @@ function renderQuickReplies() {
   const chatBox = document.getElementById('chat-messages');
   const old = chatBox.querySelector('.quick-replies'); if(old) old.remove();
   const container = document.createElement('div'); container.className = 'quick-replies';
-  const replies = ["📦 Где мой заказ?","↩️ Как вернуть?","📏 Подбор размера","💳 Оплата","🏷️ Промокод","👟 Качество/Брак","🔄 Обмен","🧼 Уход","👨‍💼 Оператор"];
-  replies.forEach(text => {
+  ["📦 Где заказ?","↩️ Возврат","📏 Размер","💳 Оплата","🏷️ Промокод","👟 Брак","🔄 Обмен","🧼 Уход","👨‍ Оператор"].forEach(text => {
     const btn = document.createElement('button'); btn.className = 'quick-reply-btn'; btn.textContent = text;
     btn.onclick = () => handleChatInput(text);
     container.appendChild(btn);
@@ -543,46 +546,45 @@ window.sendChatMessage = () => {
 function handleChatInput(text) {
   const chatBox = document.getElementById('chat-messages');
   const qr = chatBox.querySelector('.quick-replies'); if(qr) qr.remove();
-  
-  // Показать сообщение пользователя
   chatBox.innerHTML += `<div class="msg user">${text}</div>`; chatBox.scrollTop = chatBox.scrollHeight;
   
-  // Проверка на команду
-  if(text.startsWith('/')) {
-    const cmd = text.toLowerCase().trim();
-    const handler = botCommands[cmd];
-    
+  // === FIX: Проверка команд (точное совпадение, регистр не важен) ===
+  const cmd = text.trim().toLowerCase();
+  if(cmd.startsWith('/')) {
     setTimeout(() => {
+      const handler = botCommands[cmd];
       if(handler) {
-        const response = handler();
-        chatBox.innerHTML += `<div class="msg bot">${response}</div>`;
+        chatBox.innerHTML += `<div class="msg bot">${handler()}</div>`;
       } else {
-        chatBox.innerHTML += `<div class="msg bot">❌ Неизвестная команда. Введите /help для списка.</div>`;
+        chatBox.innerHTML += `<div class="msg bot">❌ Неизвестная команда. Введите /help</div>`;
       }
       chatBox.scrollTop = chatBox.scrollHeight;
-    }, 300);
+    }, 200);
     return;
   }
   
-  // Обычный ответ через FAQ
-  const lower = text.toLowerCase(); let reply = null;
+  // Обычные ответы
   const faqDB = {
-    'доставк|сроки|где заказ|трек|когда придёт|статус': '🚚 Доставка по РФ: 1-3 дня. Бесплатно от 5000₽. Трек-номер придет в SMS сразу после отправки.',
-    'возврат|вернуть|деньги назад|отказ|не понравил': '↩️ Возврат в течение 14 дней, если не носили и сохранили вид/бирки. Курьер заберет бесплатно.',
-    'размер|маломерит|большемерит|таблица|нога|полнот': '📏 Размеры по евро-сетке. Если стопа между размерами — берите больше.',
-    'оплат|карт|сбер|тиьков|сбп|наложен|рассрочк': '💳 Карты МИР, Visa, Mastercard, СБП. Есть рассрочка через банки на 3-6 мес без переплат.',
-    'промокод|скидк|купон|акци|бонус|баллы': '🎁 Введите TAPKI2026 для скидки -15%. Бонусы за отзывы и заказы.',
-    'качество|материал|кож|замш|текстиль|швы|клей|брак': '👟 Указываем материалы в карточке. Все партии проходят контроль. Если нашли брак — заменим бесплатно.',
-    'обмен|другой размер|цвет|подобрать|не подошел': '🔄 Обмен размера/цвета возможен в течение 7 дней. Оформите возврат и закажите заново.',
-    'оператор|человек|живой|связ|жалоб|проблем|не работает': '👨‍ Оператор подключится в течение 5 мин. Оставьте номер телефона, и мы перезвоним.',
-    'грязь|чистка|уход|подошва|стирк|вода|пятн': '🧼 Рекомендуем специальную пену для кроссовок. Не стирайте в машинке.',
-    'подарок|упаковк|коробк|состояни|нов|следы носк': '🎁 Доставка в фирменной коробке. По запросу добавим подарочный пакет (+199₽).'
+    'доставк|сроки|где заказ|трек|когда придёт|статус': '🚚 Доставка: 1-3 дня. Бесплатно от 5000₽.',
+    'возврат|вернуть|деньги назад|отказ|не понравил': '↩️ Возврат 14 дней. Курьер заберет бесплатно.',
+    'размер|маломерит|большемерит|таблица|нога': '📏 Размеры по евро-сетке. Если между — берите больше.',
+    'оплат|карт|сбер|тиьков|сбп|наложен': '💳 МИР, Visa, MC, СБП. Рассрочка 3-6 мес.',
+    'промокод|скидк|купон|акци|бонус': '🎁 Введите TAPKI2026 для скидки -15%.',
+    'качество|материал|кож|замш|брак': '👟 Все партии с контролем. Брак заменим.',
+    'обмен|другой размер|цвет|не подошел': '🔄 Обмен в течение 7 дней.',
+    'оператор|человек|живой|связ|жалоб': '👨‍ Оператор ответит в течение 5 мин.',
+    'грязь|чистка|уход|подошва|стирк': '🧼 Используйте пену для кроссовок.',
+    'подарок|упаковк|коробк|состояни': '🎁 Доставка в фирменной коробке.'
   };
   
-  for(const [keys, ans] of Object.entries(faqDB)) { if(keys.split('|').some(k => lower.includes(k))) { reply = ans; break; } }
+  const lower = text.toLowerCase();
+  let reply = null;
+  for(const [keys, ans] of Object.entries(faqDB)) {
+    if(keys.split('|').some(k => lower.includes(k))) { reply = ans; break; }
+  }
   
   setTimeout(() => {
-    const finalMsg = reply || '🤔 Не совсем понял вопрос. Уточните, или нажмите кнопку ниже.';
+    const finalMsg = reply || '🤔 Не понял вопрос. Нажмите кнопку выше или введите /help.';
     chatBox.innerHTML += `<div class="msg bot">${finalMsg}</div>`;
     if(!reply) chatBox.innerHTML += `<div class="quick-replies"><button class="quick-reply-btn" onclick="handleChatInput('👨‍ Оператор')">👨‍ Связаться с оператором</button></div>`;
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -595,7 +597,7 @@ document.getElementById('chat-file')?.addEventListener('change', function(e) {
   const chatBox = document.getElementById('chat-messages');
   const reader = new FileReader();
   reader.onload = ev => {
-    chatBox.innerHTML += `<div class="msg user"><img src="${ev.target.result}" alt="photo"></div>`;
+    chatBox.innerHTML += `<div class="msg user"><img src="${ev.target.result}" alt="photo" style="max-width:200px;border-radius:8px"></div>`;
     chatBox.scrollTop = chatBox.scrollHeight;
     setTimeout(() => {
       chatBox.innerHTML += `<div class="msg bot">📸 Фото принял! Менеджер проверит и ответит в течение 10 минут.</div>`;
