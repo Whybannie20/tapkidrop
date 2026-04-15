@@ -73,6 +73,7 @@ window.navigate = target => {
   if(btn) btn.classList.add('active');
   window.scrollTo({top:0,behavior:'instant'});
   if(target === 'admin') renderAdmin();
+  if(target === 'my-orders') renderMyOrders();
 };
 document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => navigate(b.dataset.target));
 
@@ -211,110 +212,49 @@ window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSO
 window.addToCart = id => { const p=products.find(x=>x.id===id); const exist=cart.find(x=>x.id===id); if(exist)exist.qty++; else cart.push({...p,qty:1}); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
 
 // ==========================================
-// 🔥 TELEGRAM (FIXED & DETAILED)
+// TELEGRAM & CHECKOUT
 // ==========================================
 function sendTelegram(orderData) {
   if(!TG_BOT_TOKEN || !TG_ADMIN_CHAT_ID) return;
-
-  // Получаем данные клиента
-  const user = auth.currentUser;
-  const userName = user ? (getUserProfile(user.email) || 'Клиент') : 'Гость';
-  const userEmail = user ? user.email : 'Нет почты';
-  
-  // Форматируем список товаров
-  let itemsText = "";
-  if(Array.isArray(orderData.cartItems)) {
-    itemsText = orderData.cartItems.map(item => `• ${item.name} (Разм: ${item.size||'?'}) — ${item.price.toLocaleString('ru')} ₽`).join('\n');
-  } else {
-    itemsText = orderData.items;
-  }
-
-  // Формируем сообщение (HTML)
-  const text = `
-🔥 <b>НОВЫЙ ЗАКАЗ #${String(orderData.id).slice(-4)}</b>
-
-👤 <b>Кто заказал:</b> ${userName}
-📧 <b>Контакты:</b> ${userEmail}
-
-🛍️ <b>Состав заказа:</b>
-${itemsText}
-
-💰 <b>ИТОГО К ОПЛАТЕ:</b> ${orderData.total} ₽
-${orderData.discount > 0 ? `🎁 <b>Скидка:</b> ${orderData.discount}%` : ''}
-
-📍 <b>Доставка (Адрес):</b>
-${orderData.address || 'Не указан'}
-
-📅 <b>Время:</b> ${new Date().toLocaleString('ru-RU')}
-  `.trim();
-
-  // Отправка
+  const text = `📦 <b>НОВЫЙ ЗАКАЗ #${String(orderData.id).slice(-4)}</b>\n👤 ${orderData.user}\n🛍️ ${orderData.items}\n📍 ${orderData.address}\n💰 <b>${orderData.total} ₽</b>`;
   fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      chat_id: TG_ADMIN_CHAT_ID,
-      text: text,
-      parse_mode: 'HTML'
-    })
-  })
-  .then(res => console.log('✅ Telegram sent'))
-  .catch(err => console.error('❌ Telegram error:', err));
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({chat_id:TG_ADMIN_CHAT_ID, text, parse_mode:'HTML'})
+  }).catch(e=>console.warn('TG Err:',e));
 }
 
-// CHECKOUT
 window.checkout = () => { 
   if(!auth.currentUser){navigate('profile');alert('Войдите в аккаунт');return;} 
   if(!cart.length) return;
-
-  // 1. Собираем данные заказа
+  
   const sub = cart.reduce((s,i)=>s+i.price*(i.qty||1),0);
-  const rank = getRankData(orderCount);
-  const discount = Math.floor(sub*(rank.discount/100));
-  const total = sub - discount;
-
-  // 2. Адрес
   const pvzData = JSON.parse(localStorage.getItem('selectedPVZ') || '{}');
-  const pvzAddress = pvzData.fullAddress || (pvzData.locality ? `${pvzData.locality}, ${pvzData.address}${pvzData.details ? ', ' + pvzData.details : ''}` : 'Не указан');
-
-  // 3. Создаем объект заказа
+  const pvzAddress = pvzData.fullAddress || (pvzData.locality ? `${pvzData.locality}, ${pvzData.address}` : 'Не указан');
+  
   const order = {
     id: Date.now(), 
     user: auth.currentUser.email,
-    userName: getUserProfile(auth.currentUser.email),
     items: cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
-    cartItems: cart, // Полный массив для отправки в бота
-    total: total.toLocaleString('ru'),
-    discount: rank.discount,
-    address: pvzAddress,
-    status:'Новый', 
-    date:new Date().toISOString()
+    total: sub.toLocaleString('ru'), 
+    address: pvzAddress, 
+    status: 'new', // new -> assembling -> shipping -> delivered
+    date: new Date().toISOString()
   };
-
-  // 4. Сохраняем в историю заказов
+  
   let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
   allOrders.push(order); 
   localStorage.setItem('allOrders', JSON.stringify(allOrders));
   
-  // 5. Помечаем товары как купленные (для отзывов)
-  cart.forEach(item => { 
-    if(!purchasedProducts.some(p=>p.id===item.id && p.user===auth.currentUser.email)) 
-      purchasedProducts.push({id:item.id, user:auth.currentUser.email, date:new Date().toISOString()}); 
-  });
+  cart.forEach(item => { if(!purchasedProducts.some(p=>p.id===item.id && p.user===auth.currentUser.email)) purchasedProducts.push({id:item.id, user:auth.currentUser.email, date:new Date().toISOString()}); });
   localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
   
-  // 6. ОТПРАВЛЯЕМ В ТЕЛЕГРАМ (теперь точно каждый раз)
   sendTelegram(order);
-
-  // 7. UI и уровни
   orderCount++; localStorage.setItem('orderCount', orderCount);
   const nr=getRankData(orderCount), pr=getRankData(orderCount-1);
   if(nr.lvl>pr.lvl) showToast(`LVL ${nr.displayLvl}`, nr.title);
-  
-  alert('✅ Заказ оформлен! Данные отправлены менеджеру.');
+  alert('✅ Заказ оформлен!');
   cart=[]; localStorage.setItem('cart','[]'); updateCartUI(); updateProfileUI();
 };
-
 function showToast(t,d){const el=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=d;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
 
 // PROFILE & ADMIN
@@ -329,12 +269,94 @@ const updateProfileUI = () => {
   if(auth.currentUser) document.getElementById('username-input').value=name;
   loadSavedPVZ();
 };
+
+// === ORDERS RENDERING (CLIENT) ===
+window.renderMyOrders = () => {
+  if(!auth.currentUser) return;
+  const container = document.getElementById('my-orders-list');
+  if(!container) return;
+  
+  const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+  const myOrders = allOrders.filter(o => o.user === auth.currentUser.email).reverse();
+  
+  if(myOrders.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px">У вас пока нет заказов.</p>';
+    return;
+  }
+  
+  container.innerHTML = myOrders.map(o => {
+    let statusText = '';
+    let statusColor = '';
+    let reviewBtn = '';
+    
+    switch(o.status) {
+      case 'new': statusText='В обработке'; statusColor='orange'; break;
+      case 'assembling': statusText='В сборке'; statusColor='#005bff'; break;
+      case 'shipping': statusText='В пути (на ПВЗ)'; statusColor='#00b341'; break;
+      case 'delivered': statusText='Доставлен'; statusColor='#111'; 
+        // Check if already reviewed
+        const reviewed = (allReviews[o.id]||[]).some(r=>r.user===auth.currentUser.email);
+        if(!reviewed) reviewBtn = `<button class="btn btn--outline" style="margin-top:8px;font-size:0.8rem;padding:6px" onclick="openProduct(${o.items.split(' ')[0]?.match(/\d+/)?.[0]} || 1)">Оставить отзыв</button>`;
+        break;
+    }
+    
+    return `
+    <div class="order-card">
+      <div class="order-head">
+        <span>Заказ #${String(o.id).slice(-4)}</span>
+        <span style="font-weight:700;color:${statusColor}">${statusText}</span>
+      </div>
+      <div class="order-body">
+        <div class="order-items">${o.items}</div>
+        <div class="order-addr">📍 ${o.address}</div>
+        <div class="order-sum">${o.total} ₽</div>
+      </div>
+      ${reviewBtn}
+    </div>`;
+  }).join('');
+};
+
+// === ADMIN ORDERS (STATUS CHANGE) ===
 function renderAdmin() {
   if(!auth.currentUser || auth.currentUser.email !== 'maslakov.antoni@yandex.ru') return; 
   const list=document.getElementById('orders-list-admin');
   const all=JSON.parse(localStorage.getItem('allOrders'))||[];
-  list.innerHTML=all.length?all.reverse().map(o=>`<div class="order-row"><div>#${String(o.id).slice(-4)}<br><small>${o.userName||o.user}</small><br><small style="color:var(--muted)">${o.address||''}</small></div><div style="text-align:right"><b>${o.total} ₽</b><br><small>${o.status}</small></div></div>`).join(''):'<p style="color:var(--muted)">Заказов нет</p>';
+  
+  if(all.length===0) {
+    list.innerHTML = '<p style="color:var(--muted)">Заказов нет</p>';
+    return;
+  }
+
+  list.innerHTML = all.reverse().map(o => {
+    const btnClass = (s) => `padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};cursor:pointer;font-size:0.75rem;margin-right:4px`;
+    return `
+    <div class="order-row">
+      <div style="flex:1">
+        <div style="font-weight:700">#${String(o.id).slice(-4)} | ${o.user}</div>
+        <div style="font-size:0.85rem;color:var(--muted)">${o.items}</div>
+        <div style="font-size:0.8rem;color:var(--muted)">📍 ${o.address}</div>
+        <div style="margin-top:6px">
+          <button class="${btnClass('new')}" onclick="updateOrderStatus(${o.id},'new')">Новый</button>
+          <button class="${btnClass('assembling')}" onclick="updateOrderStatus(${o.id},'assembling')">Сборка</button>
+          <button class="${btnClass('shipping')}" onclick="updateOrderStatus(${o.id},'shipping')">Отправлен</button>
+          <button class="${btnClass('delivered')}" onclick="updateOrderStatus(${o.id},'delivered')">Доставлен</button>
+        </div>
+      </div>
+      <div style="text-align:right"><b>${o.total} ₽</b></div>
+    </div>`;
+  }).join('');
 }
+
+window.updateOrderStatus = (id, status) => {
+  let allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+  const order = allOrders.find(o => o.id === id);
+  if(order) {
+    order.status = status;
+    localStorage.setItem('allOrders', JSON.stringify(allOrders));
+    renderAdmin();
+  }
+};
+
 window.clearAllOrders=()=>{if(confirm('Удалить историю?')){localStorage.removeItem('allOrders');renderAdmin();}};
 window.exportOrders=()=>{const a=JSON.parse(localStorage.getItem('allOrders'))||[];if(!a.length)return alert('Пусто');navigator.clipboard.writeText(a.map(o=>`#${o.id}|${o.user}|${o.total}р|${o.address||''}`).join('\n'));alert('Скопировано!');};
 
@@ -470,7 +492,6 @@ window.openPVZModal = () => {
     </div>
   `;
   
-  // Load saved data
   const saved = JSON.parse(localStorage.getItem('selectedPVZ') || '{}');
   if(saved.locality) document.getElementById('pvz-locality').value = saved.locality;
   if(saved.address) document.getElementById('pvz-address').value = saved.address;
@@ -478,33 +499,17 @@ window.openPVZModal = () => {
   
   modal.style.display = 'flex';
 };
-
 window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
-
 window.savePVZManual = () => {
   const locality = document.getElementById('pvz-locality').value.trim();
   const address = document.getElementById('pvz-address').value.trim();
   const details = document.getElementById('pvz-details').value.trim();
-  
-  if(!locality || !address) {
-    alert('⚠️ Пожалуйста, заполните Населённый пункт и Адрес');
-    return;
-  }
-  
-  const pvzData = { 
-    locality, 
-    address, 
-    details, 
-    fullAddress: `${locality}, ${address}${details ? ', ' + details : ''}`,
-    savedAt: new Date().toISOString() 
-  };
+  if(!locality || !address) { alert('⚠️ Пожалуйста, заполните Населённый пункт и Адрес'); return; }
+  const pvzData = { locality, address, details, fullAddress: `${locality}, ${address}${details ? ', ' + details : ''}`, savedAt: new Date().toISOString() };
   localStorage.setItem('selectedPVZ', JSON.stringify(pvzData));
-  
   alert('✅ Адрес сохранён! Он будет использован при оформлении заказа.');
-  closePVZModal();
-  loadSavedPVZ();
+  closePVZModal(); loadSavedPVZ();
 };
-
 function loadSavedPVZ() {
   const saved = localStorage.getItem('selectedPVZ');
   if(saved) {
@@ -527,6 +532,4 @@ if(installBtn) window.addEventListener('beforeinstallprompt', (e) => { e.prevent
 window.installApp = () => { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt=null; installBtn.style.display='none'; }); } };
 
 // INIT
-updateCartUI();
-updateProfileUI();
-loadSavedPVZ();
+updateCartUI(); updateProfileUI(); loadSavedPVZ();

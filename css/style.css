@@ -210,3 +210,13 @@ a { text-decoration: none; color: inherit; }
 .pvz-item h4{margin:0 0 4px;font-size:0.95rem}
 .pvz-item p{margin:0;color:var(--muted);font-size:0.85rem}
 .pvz-item .address{font-size:0.8rem;margin-top:4px}
+/* ORDERS STYLES */
+.order-card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.order-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.order-body { font-size: 0.9rem; }
+.order-items { font-weight: 500; margin-bottom: 6px; }
+.order-addr { color: var(--muted); margin-bottom: 6px; }
+.order-sum { font-weight: 700; font-size: 1.1rem; }
+
+/* ADMIN ORDER ROWS */
+.order-row { background: var(--card); padding: 12px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: start; border: 1px solid var(--border); }

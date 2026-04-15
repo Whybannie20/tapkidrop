@@ -146,7 +146,18 @@
       </div>
     </section>
 
-    <!-- 5. PROFILE PAGE -->
+    <!-- 5. MY ORDERS PAGE -->
+    <section id="my-orders" class="page">
+      <div class="container">
+        <button class="back-btn" onclick="navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
+        <h1 class="page-title">Мои заказы</h1>
+        <div id="my-orders-list">
+          <!-- Orders will be rendered here by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. PROFILE PAGE -->
     <section id="profile" class="page">
       <div class="profile-header">
         <div class="avatar-wrap"><div class="avatar">👤</div></div>
@@ -174,7 +185,12 @@
 
         <!-- MENU -->
         <div class="menu-grid">
-          <!-- PVZ SELECTION -->
+          <div class="menu-item" onclick="navigate('my-orders')">
+            <i class="fa-solid fa-bag-shopping"></i>
+            <span>Мои заказы</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </div>
+
           <div class="menu-item" onclick="openPVZModal()">
             <i class="fa-solid fa-location-dot"></i>
             <span>Пункт выдачи</span>
@@ -184,12 +200,6 @@
           <div class="menu-item" onclick="document.getElementById('settings-card').style.display='block'">
             <i class="fa-solid fa-user-pen"></i>
             <span>Изменить имя</span>
-            <i class="fa-solid fa-chevron-right"></i>
-          </div>
-          
-          <div class="menu-item">
-            <i class="fa-solid fa-bag-shopping"></i>
-            <span>Мои заказы</span>
             <i class="fa-solid fa-chevron-right"></i>
           </div>
           
@@ -223,7 +233,7 @@
       </div>
     </section>
 
-    <!-- 6. ADMIN PAGE -->
+    <!-- 7. ADMIN PAGE -->
     <section id="admin" class="page">
       <div class="container">
         <button class="back-btn" onclick="navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
@@ -274,29 +284,24 @@
   <div id="pvz-modal" class="pvz-modal" style="display:none">
     <div class="pvz-content">
       <div class="pvz-header">
-        <h3>Выберите пункт выдачи Wildberries</h3>
+        <h3>Адрес доставки</h3>
         <button onclick="closePVZModal()">✕</button>
       </div>
-      
-      <div class="pvz-search">
-        <input type="text" id="pvz-city-input" placeholder="Введите ваш город..." class="input">
-        <button class="btn btn--primary" onclick="searchPVZ()">Найти пункты</button>
-      </div>
-      
-      <div id="pvz-map-container" style="height:300px;background:#f0f0f0;border-radius:12px;margin:16px 0;overflow:hidden">
-        <!-- Yandex Map will be here -->
-        <div id="ymap" style="width:100%;height:100%"></div>
-      </div>
-      
-      <div class="pvz-list" id="pvz-list" style="max-height:250px;overflow-y:auto;margin-bottom:16px">
-        <p style="text-align:center;color:var(--muted);padding:20px">Введите город, чтобы увидеть доступные пункты</p>
-      </div>
-      
-      <div class="pvz-actions">
-        <button class="btn btn--outline full" onclick="closePVZModal()">Отмена</button>
+      <div style="padding:16px">
+        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">
+          Укажите, куда доставить заказ (ПВЗ, постамат, дом, офис).<br>
+          <small>Примеры: Москва, с. Красное, д. Ивановка, СНТ "Ромашка", г. Екатеринбург, ЖК "Северный"</small>
+        </p>
+        
+        <input type="text" id="pvz-locality" placeholder="Населённый пункт (Город/Село/Деревня) *" class="input" style="margin-bottom:10px">
+        <input type="text" id="pvz-address" placeholder="Улица, дом, офис, ПВЗ *" class="input" style="margin-bottom:10px">
+        <input type="text" id="pvz-details" placeholder="Детали (подъезд, этаж, код, ориентир)" class="input" style="margin-bottom:20px">
+        
+        <button class="btn btn--primary full" onclick="savePVZManual()">💾 Сохранить адрес</button>
       </div>
     </div>
   </div>
+
   <!-- === TOAST === -->
   <div id="level-toast" class="toast"><div class="toast-icon">🚀</div><div><div class="toast-title">Новый уровень!</div><div class="toast-desc" id="toast-desc"></div></div></div>
 
