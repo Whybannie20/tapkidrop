@@ -296,65 +296,104 @@ window.saveOrderQRImage = (id, input) => {
 };
 window.clearAllOrders=()=>{if(confirm('Удалить все заказы?')){localStorage.removeItem('allOrders');renderAdmin();}};
 
-// === SUPPORT CHAT & COMMANDS ===
+// === SUPPORT CHAT & COMMANDS (FIXED) ===
 const botCommands = {
-  '/stats': () => {
-    if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return '🔒 Только админам';
-    const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
+  '/stats': async () => {
+    if (!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) {
+      return '🔒 <b>Ошибка доступа:</b> Войдите в аккаунт админа (antoniobandero11@gmail.com или buldozer.mas12@gmail.com), чтобы видеть статистику.';
+    }
+    const allOrders = JSON.parse(localStorage.getItem('allOrders') || '[]');
     const allUsers = [...new Set(allOrders.map(o => o.user))];
-    const totalRevenue = allOrders.reduce((sum,o)=>sum+parseFloat(o.total.replace(/\s|₽/g,'')),0);
-    return `📊 <b>Статистика:</b>\n👥 Пользователи: ${allUsers.length}\n📦 Заказы: ${allOrders.length}\n💰 Выручка: ${totalRevenue.toLocaleString('ru')} ₽\n🛍️ Товаров: ${products.length}`;
+    const totalRevenue = allOrders.reduce((sum, o) => sum + parseFloat(o.total.replace(/\s|₽/g, '')), 0);
+    return `📊 <b>Статистика сайта:</b>\n👥 Пользователи: ${allUsers.length}\n📦 Заказы: ${allOrders.length}\n💰 Выручка: ${totalRevenue.toLocaleString('ru')} ₽\n🛍️ Товаров в базе: ${products.length}`;
   },
-  
-  '/add': (args) => addProductFromChat(args), // Делегируем асинхронную функцию
-  
+
+  '/add': async (args) => {
+    if (!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) {
+      return '🔒 <b>Ошибка доступа:</b> Войдите как админ, чтобы добавлять товары.';
+    }
+    const parts = args.split('|').map(p => p.trim());
+    if (parts.length < 5) return '❌ <b>Неверный формат!</b>\n\nИспользуйте:\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2\n\nПример:\n/add Yeezy 350 | 15000 | swag | 40,41,42,43 | Уличные кроссы | https://img1.jpg, https://img2.jpg';
+
+    const [name, priceStr, category, sizesStr, desc, imgsRaw] = parts;
+    const price = Number(priceStr);
+    if (isNaN(price) || price <= 0) return '❌ Цена должна быть числом (например, 15000)';
+
+    const images = imgsRaw 
+      ? imgsRaw.split(',').map(url => url.trim()).filter(url => url.startsWith('http')) 
+      : ['👟'];
+    if (images.length === 0) images.push('👟');
+
+    const newProduct = {
+      name, price, category, 
+      sizes: sizesStr.split(',').map(s => s.trim()), 
+      desc, images,
+      rating: 5.0, reviews: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await db.collection('products').add(newProduct);
+      return `✅ <b>${name}</b> успешно добавлен!\n💰 ${price.toLocaleString('ru')} ₽ | 📏 ${sizesStr}\n🖼️ Фото: ${images.length} шт.`;
+    } catch (e) {
+      return `❌ Ошибка базы данных: ${e.message}`;
+    }
+  },
+
   '/help': () => `🤖 <b>Команды админа:</b>
 
-/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2
-Пример: /add Yeezy 350 | 15000 | swag | 40,41,42,43 | Уличные кроссы | https://img1.jpg, https://img2.jpg
+/add Название | Цена | Категория | Размеры | Описание | [Фото1, Фото2]
+Пример: /add Jordan 1 | 14990 | designer | 39,40,41 | Классика | https://link1.jpg, https://link2.jpg
 
-/stats — статистика
-/users — список клиентов
-/orders — последние заказы
-/clear confirm — очистить базу`,
-};
+/stats — полная статистика
+/help — эта справка
 
-window.openSupportChat = () => {
-  document.getElementById('support-modal').style.display = 'flex';
-  const chatBox = document.getElementById('chat-messages');
-  chatBox.innerHTML = '<div class="msg bot">👋 Привет! Введите /help для команд.</div>';
+⚠️ Команды работают только если вы вошли как админ.`
 };
-window.closeSupportChat = () => document.getElementById('support-modal').style.display = 'none';
 
 window.sendChatMessage = () => {
-  const input = document.getElementById('chat-input'); const text = input.value.trim(); if(!text) return;
-  input.value = '';
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
   const chatBox = document.getElementById('chat-messages');
-  chatBox.innerHTML += `<div class="msg user">${text}</div>`; chatBox.scrollTop = chatBox.scrollHeight;
-  
-  const cmdMatch = text.match(/^\/(\w+)\s*(.*)?$/);
-  if(cmdMatch) {
-    const cmd = '/' + cmdMatch[1].toLowerCase();
-    const args = cmdMatch[2] || '';
-    setTimeout(async () => {
-      if(botCommands[cmd]) {
-        const response = await botCommands[cmd](args);
-        chatBox.innerHTML += `<div class="msg bot">${response}</div>`;
-      } else {
-        chatBox.innerHTML += `<div class="msg bot">❌ Неизвестная команда. Введите /help</div>`;
-      }
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }, 300);
-    return;
+  chatBox.innerHTML += `<div class="msg user">${text}</div>`;
+  input.value = '';
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // Проверяем, начинается ли сообщение с /
+  if (text.startsWith('/')) {
+    const match = text.match(/^\/(\w+)\s*(.*)?$/);
+    if (match) {
+      const cmd = '/' + match[1].toLowerCase();
+      const args = match[2] || '';
+      
+      setTimeout(async () => {
+        try {
+          if (botCommands[cmd]) {
+            const response = await botCommands[cmd](args);
+            chatBox.innerHTML += `<div class="msg bot">${response}</div>`;
+          } else {
+            chatBox.innerHTML += `<div class="msg bot">❌ Команда "${cmd}" не найдена. Введите /help</div>`;
+          }
+        } catch (err) {
+          chatBox.innerHTML += `<div class="msg bot">⚠️ Ошибка выполнения: ${err.message}</div>`;
+          console.error('Bot command error:', err);
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, 400);
+      return;
+    }
   }
-  
-  // Обычные ответы (FAQ)
+
+  // Если это не команда
   setTimeout(() => {
-    chatBox.innerHTML += `<div class="msg bot">🤔 Не понял. Введите /help или задайте вопрос.</div>`;
+    chatBox.innerHTML += `<div class="msg bot">🤖 Я понимаю только команды. Введите /help для списка.</div>`;
     chatBox.scrollTop = chatBox.scrollHeight;
   }, 500);
 };
 
+// Остальной код (Auth, Init) остается без изменений...
 // === AUTH ===
 const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
 let isLogin=true;
