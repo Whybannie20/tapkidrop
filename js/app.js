@@ -1,4 +1,4 @@
-// === FIREBASE & FIRESTORE CONFIG ===
+// === 1. FIREBASE & FIRESTORE CONFIG ===
 const firebaseConfig = {
   apiKey: "AIzaSyBv1oWzM9P_mCGIDNYpcj5SehNmtOjzaX0",
   authDomain: "tapkidrop-7550b.firebaseapp.com",
@@ -7,34 +7,35 @@ const firebaseConfig = {
   messagingSenderId: "804177130427",
   appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
 };
-if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+// Инициализация
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 const auth = firebase.auth();
-const db = firebase.firestore();
+const db = firebase.firestore(); // База данных Firestore
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
-// === TELEGRAM & ADMIN ===
-const TG_BOT_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
-const TG_ADMIN_CHAT_ID = "-1003371505343";
-const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
-const isAdmin = (email) => ADMIN_EMAILS.includes(email);
+console.log("[INIT] Firebase loaded");
 
-// STATE
+// === 2. GLOBAL STATE ===
+const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
 let purchasedProducts = JSON.parse(localStorage.getItem('purchasedProducts')) || [];
-let products = [];
+let products = []; // Сюда загрузятся товары из БД
 let currentProductId = null;
 let selectedSize = null;
-let selectedPhotos = [];
 
-// === CATEGORIES ===
+// Категории
 const categories = [
   {id:'all',name:'Все',icon:'🔍'},{id:'designer',name:'Дизайнерские',icon:'✨'},{id:'kids',name:'Детские',icon:'🧒'},
   {id:'swag',name:'Сваг',icon:'🔥'},{id:'classics',name:'Классика',icon:'👟'},{id:'sale',name:'Распродажа',icon:'🏷️'}
 ];
 
-// === LOAD PRODUCTS FROM FIRESTORE ===
+// === 3. DATABASE FUNCTIONS ===
 function loadProductsFromDB() {
+  console.log("[DB] Loading products...");
   db.collection('products').get().then(snapshot => {
     products = [];
     snapshot.forEach(doc => {
@@ -42,47 +43,16 @@ function loadProductsFromDB() {
       data.id = doc.id;
       products.push(data);
     });
+    console.log(`[DB] Loaded ${products.length} products`);
     renderGrid('home-grid', products.slice(0,4));
     renderGrid('catalog-grid', products);
-  }).catch(err => console.error('DB Error:', err));
+  }).catch(err => {
+    console.error("[DB] Error:", err);
+    alert("Ошибка загрузки товаров. Проверьте консоль (F12).");
+  });
 }
 
-// === SAVE NEW PRODUCT (Called by Bot) ===
-window.addProductFromChat = async (args) => {
-  if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return '🔒 Доступ только для админов';
-  
-  // Формат: Название | Цена | Категория | Размеры | Описание | Фото1, Фото2, Фото3
-  const parts = args.split('|').map(p => p.trim());
-  if(parts.length < 5) return '❌ Ошибка формата!\n\nИспользуй:\n<b>/add Название | Цена | Категория | Размеры | Описание | [Фото1, Фото2]</b>';
-  
-  const name = parts[0];
-  const price = Number(parts[1]);
-  const category = parts[2];
-  const sizes = parts[3].split(',').map(s => s.trim());
-  const desc = parts[4];
-  const imgsRaw = parts[5] || '';
-  
-  // Парсим фото: если есть ссылки, делаем массив. Иначе ставим эмодзи.
-  const images = imgsRaw 
-    ? imgsRaw.split(',').map(url => url.trim()).filter(url => url.startsWith('http')) 
-    : ['👟'];
-  if(images.length === 0) images.push('👟');
-
-  const newProduct = {
-    name, price, category, sizes, desc, images,
-    rating: 5.0, reviews: 0,
-    createdAt: new Date().toISOString()
-  };
-
-  try {
-    await db.collection('products').add(newProduct);
-    return `✅ <b>${name}</b> добавлен в каталог!\n💰 ${price.toLocaleString('ru')} ₽ | 📏 ${sizes.join(', ')}\n🖼️ Фото: ${images.length} шт.`;
-  } catch(e) {
-    return `❌ Ошибка: ${e.message}`;
-  }
-};
-
-// === RENDER FUNCTIONS ===
+// === 4. RENDER UI ===
 const createCard = p => {
   const mainImg = p.images && p.images[0] ? p.images[0] : '👟';
   const imgHtml = mainImg.startsWith('http') 
@@ -106,19 +76,27 @@ const renderGrid = (id, list) => {
   if(el) el.innerHTML = list.map(createCard).join('');
 };
 
-// === NAVIGATION ===
+// === 5. NAVIGATION ===
 window.navigate = target => {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  const el = document.getElementById(target); if(el) el.classList.add('active');
+  const el = document.getElementById(target); 
+  if(el) el.classList.add('active');
+  
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  const btn = document.querySelector(`.nav-item[data-target="${target}"]`); if(btn) btn.classList.add('active');
+  const btn = document.querySelector(`.nav-item[data-target="${target}"]`); 
+  if(btn) btn.classList.add('active');
+  
   window.scrollTo({top:0,behavior:'instant'});
   if(target === 'admin') renderAdmin();
   if(target === 'my-orders') renderMyOrders();
 };
-document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => navigate(b.dataset.target));
 
-// === PRODUCT DETAILS (WITH GALLERY) ===
+// Клик по навигации
+document.querySelectorAll('.nav-item').forEach(b => {
+  b.onclick = () => navigate(b.dataset.target);
+});
+
+// === 6. PRODUCT DETAILS ===
 window.openProduct = id => {
   const p = products.find(x => x.id === id);
   if(!p) return;
@@ -136,7 +114,7 @@ window.openProduct = id => {
   document.getElementById('detail-desc').textContent = p.desc;
   document.getElementById('sizes-container').innerHTML = p.sizes.map(s => `<button class="size-btn" onclick="selectSize(this, '${s}')">${s}</button>`).join('');
   
-  // Галерея миниатюр
+  // Галерея
   const thumbContainer = document.getElementById('product-thumbs');
   thumbContainer.innerHTML = '';
   if(p.images && p.images.length > 1) {
@@ -156,7 +134,7 @@ window.openProduct = id => {
   navigate('product');
 };
 
-// CSS for thumbs (injected dynamically if not exists)
+// Стили для галереи (если еще нет)
 if(!document.getElementById('thumb-styles')) {
   const style = document.createElement('style');
   style.id = 'thumb-styles';
@@ -182,13 +160,17 @@ window.addToCart = id => {
   localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI();
 };
 
-// === CART UI ===
+// === 7. CART UI ===
 const updateCartUI = () => {
-  const badge = document.getElementById('cart-badge'); if(badge) badge.textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
+  const badge = document.getElementById('cart-badge'); 
+  if(badge) badge.textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
+  
   const empty=document.getElementById('cart-empty'), layout=document.getElementById('cart-layout');
   if(!empty || !layout) return;
+  
   if(!cart.length){empty.style.display='block';layout.style.display='none';return;}
   empty.style.display='none';layout.style.display='grid';
+  
   document.getElementById('cart-items').innerHTML = cart.map((i,idx)=>`
     <div class="cart-item">
       <div class="cart-item-info">
@@ -206,7 +188,10 @@ const updateCartUI = () => {
 window.changeQty = (idx,d) => { cart[idx].qty=(cart[idx].qty||1)+d; if(cart[idx].qty<1)cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
 window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCartUI(); };
 
-// === CHECKOUT & TELEGRAM ===
+// === 8. CHECKOUT & TELEGRAM ===
+const TG_BOT_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
+const TG_ADMIN_CHAT_ID = "-1003371505343";
+
 function sendTelegram(orderData) {
   if(!TG_BOT_TOKEN || !TG_ADMIN_CHAT_ID) return;
   const text = `📦 <b>НОВЫЙ ЗАКАЗ #${String(orderData.id).slice(-4)}</b>\n👤 ${orderData.user}\n🛍️ ${orderData.items}\n📍 ${orderData.address}\n💰 <b>${orderData.total} ₽</b>`;
@@ -237,7 +222,7 @@ window.checkout = () => {
   cart=[]; localStorage.setItem('cart','[]'); updateCartUI();
 };
 
-// === MY ORDERS ===
+// === 9. MY ORDERS ===
 window.renderMyOrders = () => {
   if(!auth.currentUser) return;
   const container = document.getElementById('my-orders-list'); if(!container) return;
@@ -258,9 +243,9 @@ window.renderMyOrders = () => {
   }).join('');
 };
 
-// === ADMIN PANEL ===
+// === 10. ADMIN PANEL ===
 function renderAdmin() {
-  if(!auth.currentUser || !isAdmin(auth.currentUser.email)) return; 
+  if(!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) return; 
   const container = document.getElementById('orders-list-admin'); if(!container) return;
   const allOrders = JSON.parse(localStorage.getItem('allOrders'))||[];
   const stats = document.getElementById('admin-stats');
@@ -296,21 +281,17 @@ window.saveOrderQRImage = (id, input) => {
 };
 window.clearAllOrders=()=>{if(confirm('Удалить все заказы?')){localStorage.removeItem('allOrders');renderAdmin();}};
 
-// === SUPPORT CHAT & COMMANDS (DEBUG MODE) ===
-window.ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
-
+// === 11. SUPPORT CHAT & BOT COMMANDS ===
 const botCommands = {
   '/test': () => '✅ <b>Связь работает!</b> Бот видит ваши команды.',
   '/stats': () => {
-    if (!auth.currentUser || !window.ADMIN_EMAILS.includes(auth.currentUser.email)) {
-      return '🔒 <b>Войдите как админ</b>, чтобы видеть статистику.';
-    }
+    if (!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 <b>Войдите как админ</b>, чтобы видеть статистику.';
     const orders = JSON.parse(localStorage.getItem('allOrders') || '[]');
     const rev = orders.reduce((s, o) => s + parseFloat(o.total.replace(/\s|₽/g, '')) || 0, 0);
     return `📊 <b>Статистика:</b>\n📦 Заказов: ${orders.length}\n💰 Выручка: ${rev.toLocaleString('ru')} ₽\n🛍️ Товаров: ${products.length}`;
   },
   '/add': async (args) => {
-    if (!auth.currentUser || !window.ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 Требуется вход под админом.';
+    if (!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 Требуется вход под админом.';
     const parts = args.split('|').map(p => p.trim());
     if (parts.length < 5) return '❌ Формат:\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2';
     
@@ -334,7 +315,7 @@ const botCommands = {
 
 // Глобальная функция для кнопки в HTML
 window.sendChatMessage = function() {
-  console.log('[CHAT] Кнопка нажата'); // Отладка
+  console.log('[CHAT] Кнопка нажата');
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
   if (!text) return;
@@ -376,7 +357,7 @@ window.sendChatMessage = function() {
   }, 400);
 };
 
-// === AUTH ===
+// === 12. AUTH LOGIC ===
 const authForm = document.getElementById('auth-form');
 const emailIn = document.getElementById('email-input');
 const passIn = document.getElementById('pass-input');
@@ -411,7 +392,7 @@ auth.onAuthStateChanged(user => {
     document.getElementById('auth-flow').style.display = 'none';
     document.getElementById('profile-actions').style.display = 'block';
     document.getElementById('profile-email').textContent = user.email;
-    if (window.ADMIN_EMAILS.includes(user.email) && !document.getElementById('admin-link')) {
+    if (ADMIN_EMAILS.includes(user.email) && !document.getElementById('admin-link')) {
       document.querySelector('.menu-grid').innerHTML += `<div class="menu-item" id="admin-link" onclick="navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админка</span></div>`;
     }
   } else {
@@ -424,7 +405,7 @@ auth.onAuthStateChanged(user => {
 });
 document.getElementById('logout-btn').onclick = () => auth.signOut();
 
-// === INIT ===
+// === 13. INIT ===
+console.log("[INIT] Starting App...");
 loadProductsFromDB();
 updateCartUI();
-console.log('[INIT] Скрипт запущен успешно');
