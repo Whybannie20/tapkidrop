@@ -1,18 +1,21 @@
-// === 1. FIREBASE INIT (GLOBAL SCOPE) ===
-const firebaseConfig = {
-  apiKey: "AIzaSyBv1oWzM9P_mCGIDNYpcj5SehNmtOjzaX0",
-  authDomain: "tapkidrop-7550b.firebaseapp.com",
-  projectId: "tapkidrop-7550b",
-  storageBucket: "tapkidrop-7550b.firebasestorage.app",
-  messagingSenderId: "804177130427",
-  appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
-};
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth(); // ГЛОБАЛЬНО
-const db = firebase.firestore();
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+// === 1. FIREBASE INIT ===
+try {
+  const firebaseConfig = {
+    apiKey: "AIzaSyBv1oWzM9P_mCGIDNYpcj5SehNmtOjzaX0",
+    authDomain: "tapkidrop-7550b.firebaseapp.com",
+    projectId: "tapkidrop-7550b",
+    storageBucket: "tapkidrop-7550b.firebasestorage.app",
+    messagingSenderId: "804177130427",
+    appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  console.log("[FB] OK");
+} catch (e) { console.error("[FB] Init error:", e); }
 
-// === 2. CONFIG & STATE ===
+// === 2. GLOBALS ===
 const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
@@ -21,6 +24,9 @@ let products = [];
 let currentProductId = null;
 let selectedSize = null;
 
+// Адрес доставки
+let selectedPVZ = JSON.parse(localStorage.getItem('selectedPVZ')) || { city: '', address: '', details: '' };
+
 const categories = [
   {id:'all',name:'Все'},{id:'designer',name:'Дизайнерские'},{id:'kids',name:'Детские'},
   {id:'swag',name:'Сваг'},{id:'classics',name:'Классика'},{id:'sale',name:'Распродажа'}
@@ -28,13 +34,15 @@ const categories = [
 
 // === 3. DB & RENDER ===
 function loadProducts() {
-  db.collection('products').get().then(snap => {
-    products = [];
-    snap.forEach(d => { const data = d.data(); data.id = d.id; products.push(data); });
-    renderGrid('home-grid', products.slice(0,4));
-    renderGrid('catalog-grid', products);
-    console.log(`[DB] Загружено товаров: ${products.length}`);
-  }).catch(err => console.error("[DB] Ошибка загрузки:", err));
+  try {
+    db.collection('products').get().then(snap => {
+      products = [];
+      snap.forEach(d => { const data = d.data(); data.id = d.id; products.push(data); });
+      renderGrid('home-grid', products.slice(0,4));
+      renderGrid('catalog-grid', products);
+      console.log("[DB] Loaded", products.length);
+    });
+  } catch(e) { console.error("[DB] Load error", e); }
 }
 
 const renderGrid = (id, list) => {
@@ -135,27 +143,50 @@ const updateCart = () => {
 window.changeQty = (idx,d) => { cart[idx].qty=(cart[idx].qty||1)+d; if(cart[idx].qty<1)cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCart(); };
 window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCart(); };
 
-// === 7. CHECKOUT ===
+// === 7. ADDRESS / PVZ ===
+window.openPVZModal = () => {
+  document.getElementById('pvz-city').value = selectedPVZ.city || '';
+  document.getElementById('pvz-address').value = selectedPVZ.address || '';
+  document.getElementById('pvz-details').value = selectedPVZ.details || '';
+  document.getElementById('pvz-modal').style.display = 'flex';
+};
+window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
+window.savePVZ = () => {
+  selectedPVZ.city = document.getElementById('pvz-city').value;
+  selectedPVZ.address = document.getElementById('pvz-address').value;
+  selectedPVZ.details = document.getElementById('pvz-details').value;
+  localStorage.setItem('selectedPVZ', JSON.stringify(selectedPVZ));
+  alert('✅ Адрес сохранен');
+  window.closePVZModal();
+};
+
+// === 8. CHECKOUT ===
 window.checkout = () => {
   const user = auth.currentUser;
   if(!user) { window.navigate('profile'); return alert('Войдите в аккаунт'); }
   if(!cart.length) return;
+  
+  const fullAddress = `${selectedPVZ.city || 'Не указан город'}, ${selectedPVZ.address || 'Не указан адрес'} ${selectedPVZ.details || ''}`;
   const total = cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
+  
   const order = {
     id: Date.now(), user: user.email,
     items: cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
-    total: total.toLocaleString('ru'), address: 'Не указан', status: 'new', qrImage: '', date: new Date().toISOString()
+    total: total.toLocaleString('ru'), 
+    address: fullAddress, 
+    status: 'new', qrImage: '', date: new Date().toISOString()
   };
+  
   let orders = JSON.parse(localStorage.getItem('allOrders'))||[];
   orders.push(order); localStorage.setItem('allOrders', JSON.stringify(orders));
   cart.forEach(it => { if(!purchasedProducts.some(p=>p.id===it.id && p.user===user.email)) purchasedProducts.push({id:it.id, user:user.email, date:new Date().toISOString()}); });
   localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
   orderCount++; localStorage.setItem('orderCount', orderCount);
-  alert('✅ Заказ оформлен');
+  alert('✅ Заказ оформлен: ' + fullAddress);
   cart=[]; localStorage.setItem('cart','[]'); updateCart();
 };
 
-// === 8. ORDERS ===
+// === 9. ORDERS ===
 window.renderOrders = () => {
   const c = document.getElementById('my-orders-list'); if(!c) return;
   const orders = JSON.parse(localStorage.getItem('allOrders'))||[];
@@ -164,13 +195,14 @@ window.renderOrders = () => {
   c.innerHTML = mine.length ? mine.map(o => `
     <div style="background:var(--card);padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;font-weight:700"><span>#${String(o.id).slice(-4)}</span><span style="color:${o.status==='delivered'?'var(--success)':'orange'}">${o.status}</span></div>
+      <div style="font-size:0.8rem;color:var(--muted);margin:4px 0">📍 ${o.address}</div>
       <div style="font-size:0.9rem;margin:6px 0">${o.items}</div>
       <div style="font-weight:600">${o.total} ₽</div>
       ${o.qrImage ? `<img src="${o.qrImage}" style="max-width:100%;margin-top:8px;border-radius:8px">` : ''}
     </div>`).join('') : '<p style="text-align:center;color:var(--muted);padding:20px">Нет заказов</p>';
 };
 
-// === 9. ADMIN ===
+// === 10. ADMIN ===
 function renderAdmin() {
   const c = document.getElementById('orders-list-admin'); if(!c) return;
   const orders = JSON.parse(localStorage.getItem('allOrders'))||[];
@@ -178,9 +210,9 @@ function renderAdmin() {
   if(st) st.innerHTML = `<div class="stat-box"><span class="stat-num">${orders.length}</span><small>Заказов</small></div>`;
   c.innerHTML = orders.reverse().map(o => `
     <div class="order-row">
-      <div style="flex:1"><b>#${String(o.id).slice(-4)} | ${o.user?.split('@')[0]}</b><br><small>${o.items}</small>
+      <div style="flex:1"><b>#${String(o.id).slice(-4)} | ${o.user?.split('@')[0]}</b><br><small>${o.items}</small><br><small style="color:var(--muted)">📍 ${o.address}</small>
         <div style="margin-top:6px">${['new','assembling','shipping','delivered'].map(s=>`<button style="padding:4px 8px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};border-radius:4px;cursor:pointer;font-size:0.75rem" onclick="window.updateStatus(${o.id},'${s}')">${s}</button>`).join('')}</div>
-        ${o.status==='delivered'?`<div style="margin-top:8px"><input type="file" id="qr-${o.id}" accept="image/*" style="display:none" onchange="window.uploadQR(${o.id},this)"><label for="qr-${o.id}" style="padding:4px 8px;background:var(--success);color:#fff;border-radius:4px;cursor:pointer;font-size:0.75rem">📷 Загрузить QR</label></div>`:''}
+        ${o.status==='delivered'?`<div style="margin-top:8px"><input type="file" id="qr-${o.id}" accept="image/*" style="display:none" onchange="window.uploadQR(${o.id},this)"><label for="qr-${o.id}" style="padding:4px 8px;background:var(--success);color:#fff;border-radius:4px;cursor:pointer;font-size:0.75rem">📷 QR</label></div>`:''}
       </div>
       <div style="text-align:right"><b>${o.total} ₽</b></div>
     </div>`).join('');
@@ -201,7 +233,7 @@ window.uploadQR = (id, input) => {
   reader.readAsDataURL(file);
 };
 
-// === 10. CHAT & BOT ===
+// === 11. HYBRID CHAT (CLIENT FAQ + ADMIN COMMANDS) ===
 const botCommands = {
   '/test': () => '✅ Бот работает. Вы админ: ' + (ADMIN_EMAILS.includes(auth.currentUser?.email) ? 'Да' : 'Нет'),
   '/stats': () => {
@@ -222,13 +254,24 @@ const botCommands = {
       return `✅ ${name} добавлен в каталог`;
     } catch(e) { return `❌ ${e.message}`; }
   },
-  '/help': () => '🤖 Команды:\n/test — проверка\n/stats — статистика\n/add Name|Price|Cat|Sizes|Desc|Img1,Img2 — добавить товар'
+  '/help': () => '🤖 <b>Команды админа:</b>\n/stats — статистика\n/add Name|Price|Cat|Sizes|Desc|Img — добавить товар\n\n<b>Клиент:</b> просто напишите вопрос.'
+};
+
+const faqDB = {
+  'доставк|сроки|когда': '🚚 Доставка 1-3 дня. Бесплатно от 5000₽.',
+  'возврат|вернуть|деньги': '↩️ Возврат 14 дней. Курьер заберет бесплатно.',
+  'размер|маломерит|нога': '📏 Размеры по евро-сетке. Если между размерами — берите больше.',
+  'оплат|карт|сбер': '💳 Карты МИР, Visa, MC, СБП. Рассрочка есть.',
+  'промокод|скидк|купон': '🎁 Введите TAPKI2026 для скидки -15% в корзине.',
+  'качество|брак|материал': '👟 Только оригинал. Брак меняем за наш счет.',
+  'оператор|человек|живой': '👨‍ Оператор ответит в течение 5 минут.',
+  'адрес|пвз|где забрать': '📍 Адрес выберите в Профиле -> Адрес доставки.'
 };
 
 window.openSupportChat = () => {
   document.getElementById('support-modal').style.display = 'flex';
   const box = document.getElementById('chat-messages');
-  box.innerHTML = '<div class="msg bot">👋 Введите /help</div>';
+  box.innerHTML = '<div class="msg bot">👋 Привет! Я помощник ТапкиДроп. Чем помочь?</div>';
 };
 window.closeSupportChat = () => document.getElementById('support-modal').style.display = 'none';
 
@@ -237,7 +280,8 @@ window.sendChatMessage = () => {
   const box = document.getElementById('chat-messages');
   box.innerHTML += `<div class="msg user">${txt}</div>`; inp.value=''; box.scrollTop=box.scrollHeight;
   
-  if(txt.startsWith('/')) {
+  // Admin Commands
+  if(txt.startsWith('/') && auth.currentUser && ADMIN_EMAILS.includes(auth.currentUser.email)) {
     const m = txt.match(/^\/(\w+)\s*(.*)?$/);
     if(m) {
       const cmd = '/' + m[1].toLowerCase(); const args = m[2]||'';
@@ -246,13 +290,30 @@ window.sendChatMessage = () => {
         box.innerHTML += `<div class="msg bot">${handler ? await handler(args) : '❌ Неизвестная команда'}</div>`;
         box.scrollTop=box.scrollHeight;
       }, 300);
+      return;
     }
-  } else {
-    setTimeout(() => { box.innerHTML += `<div class="msg bot">🤖 Введите /help</div>`; box.scrollTop=box.scrollHeight; }, 400);
   }
+
+  // Client FAQ
+  setTimeout(() => {
+    const lower = txt.toLowerCase();
+    let reply = null;
+    for(const [keys, ans] of Object.entries(faqDB)) {
+      if(keys.split('|').some(k => lower.includes(k))) { reply = ans; break; }
+    }
+    box.innerHTML += `<div class="msg bot">${reply || '🤔 Не совсем понял. Попробуйте переформулировать или нажмите "Оператор".'}</div>`;
+    if(!reply) {
+       box.innerHTML += `<div class="msg bot" style="background:#e0e0e0;cursor:pointer" onclick="window.sendChatMessageDirect('Хочу к оператору')">👨‍ Связаться с оператором</div>`;
+    }
+    box.scrollTop=box.scrollHeight;
+  }, 500);
+};
+window.sendChatMessageDirect = (txt) => {
+  const inp = document.getElementById('chat-input'); inp.value = txt;
+  window.sendChatMessage();
 };
 
-// === 11. AUTH (FIXED) ===
+// === 12. AUTH (FIXED) ===
 const authForm = document.getElementById('auth-form');
 if(authForm) {
   let isLogin = true;
@@ -270,20 +331,20 @@ if(authForm) {
     const btn = document.getElementById('auth-submit');
     const err = document.getElementById('auth-error');
     
-    console.log('[AUTH] Попытка входа:', em);
-    err.style.display='none'; btn.disabled=true; btn.textContent='Вход...';
+    console.log('[AUTH] Попытка:', em);
+    err.style.display='none'; btn.disabled=true; btn.textContent='...';
     
     try {
       if(isLogin) await auth.signInWithEmailAndPassword(em, pw);
       else await auth.createUserWithEmailAndPassword(em, pw);
       console.log('[AUTH] Успех');
     } catch(e) {
-      console.error('[AUTH] Ошибка:', e.code, e.message);
+      console.error('[AUTH] Ошибка:', e.code);
       const msgs = {
-        'auth/user-not-found': 'Пользователь не найден. Проверьте email или зарегистрируйтесь.',
+        'auth/user-not-found': 'Пользователь не найден.',
         'auth/wrong-password': 'Неверный пароль.',
-        'auth/invalid-email': 'Неверный формат email.',
-        'auth/weak-password': 'Пароль минимум 6 символов.'
+        'auth/invalid-email': 'Неверный email.',
+        'auth/weak-password': 'Пароль мин. 6 символов.'
       };
       err.textContent = msgs[e.code] || e.message;
       err.style.display='block';
@@ -312,10 +373,10 @@ if(authForm) {
   
   document.getElementById('logout-btn').onclick = () => {
     auth.signOut();
-    console.log('[AUTH] Выход выполнен');
+    console.log('[AUTH] Выход');
   };
 }
 
-// === 12. INIT ===
+// === 13. INIT ===
 loadProducts();
 updateCart();

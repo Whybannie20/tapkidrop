@@ -73,7 +73,7 @@
             <div class="price-block"><span class="current" id="detail-price">0 ₽</span></div>
             <p id="detail-desc" class="desc"></p>
             <div class="sizes" id="sizes-container"></div>
-            <button class="btn btn--primary full" onclick="addToCartFromDetail()">В корзину</button>
+            <button class="btn btn--primary full" onclick="window.addToCartFromDetail()">В корзину</button>
           </div>
         </div>
         <div class="reviews-section"><h3>Отзывы</h3><div class="reviews-list" id="reviews-list"></div></div>
@@ -88,7 +88,7 @@
           <div class="cart-items" id="cart-items"></div>
           <div class="cart-summary">
             <div class="summary-row total"><span>Итого</span><span id="cart-total">0 ₽</span></div>
-            <button class="btn btn--primary full" onclick="checkout()">Оформить</button>
+            <button class="btn btn--primary full" onclick="window.checkout()">Оформить</button>
           </div>
         </div>
       </div>
@@ -111,7 +111,15 @@
       <div class="container">
         <div class="menu-grid">
           <div class="menu-item" onclick="window.navigate('my-orders')"><i class="fa-solid fa-bag-shopping"></i><span>Мои заказы</span><i class="fa-solid fa-chevron-right"></i></div>
-          <div class="menu-item" onclick="openSupportChat()"><i class="fa-solid fa-headset"></i><span>Поддержка</span><i class="fa-solid fa-chevron-right"></i></div>
+          
+          <!-- PVZ Address Button -->
+          <div class="menu-item" onclick="window.openPVZModal()">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Адрес доставки</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </div>
+
+          <div class="menu-item" onclick="window.openSupportChat()"><i class="fa-solid fa-headset"></i><span>Поддержка</span><i class="fa-solid fa-chevron-right"></i></div>
         </div>
         <div id="auth-flow">
           <div class="auth-card">
@@ -145,14 +153,30 @@
     <button class="nav-item" data-target="profile"><i class="fa-regular fa-user"></i><span>Профиль</span></button>
   </nav>
 
-  <!-- SUPPORT MODAL -->
-  <div id="support-modal" class="modal-overlay" style="display:none">
-    <div class="modal-box">
-      <div class="modal-head"><h3>Поддержка</h3><button onclick="closeSupportChat()">✕</button></div>
-      <div class="modal-body" id="chat-messages"></div>
-      <div class="modal-foot">
-        <input type="text" id="chat-input" placeholder="Введите /help">
-        <button onclick="window.sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+  <!-- FULLSCREEN SUPPORT MODAL -->
+  <div id="support-modal" class="support-fullscreen" style="display:none">
+    <div class="support-header">
+      <button onclick="window.closeSupportChat()" style="background:none;border:none;color:#fff;font-size:1.2rem">✕</button>
+      <h3 style="margin:0;color:#fff;font-size:1.1rem">Поддержка</h3>
+      <div style="width:24px"></div>
+    </div>
+    <div class="support-body" id="chat-messages"></div>
+    <div class="support-footer">
+      <input type="text" id="chat-input" placeholder="Введите вопрос или команду...">
+      <button onclick="window.sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <!-- PVZ / ADDRESS MODAL -->
+  <div id="pvz-modal" class="pvz-modal" style="display:none">
+    <div class="pvz-content">
+      <div class="pvz-header"><h3>Адрес доставки</h3><button onclick="window.closePVZModal()">✕</button></div>
+      <div style="padding:16px">
+        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Укажите адрес ПВЗ Wildberries или другой адрес:</p>
+        <input type="text" id="pvz-city" placeholder="Город (напр. Москва)" class="input">
+        <input type="text" id="pvz-address" placeholder="Адрес (напр. ул. Ленина, 5)" class="input">
+        <input type="text" id="pvz-details" placeholder="Детали (напр. ПВЗ №12345)" class="input">
+        <button class="btn btn--primary full" onclick="window.savePVZ()">💾 Сохранить адрес</button>
       </div>
     </div>
   </div>
