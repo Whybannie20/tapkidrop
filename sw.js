@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tapkidrop-v2';
+const CACHE_NAME = 'tapkidrop-v3';
 const ASSETS = ['/', '/index.html', '/css/style.css', '/js/app.js', '/manifest.json'];
 
 self.addEventListener('install', e => {
