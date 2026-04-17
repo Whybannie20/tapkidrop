@@ -9,23 +9,23 @@ try {
     appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
   };
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  window.auth = firebase.auth(); // Global window.auth for HTML access
+  window.db = firebase.firestore();
+  window.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
   console.log("[FB] OK");
 } catch (e) { console.error("[FB] Init error:", e); }
 
 // === 2. GLOBALS ===
 const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
-let cart = JSON.parse(localStorage.getItem('cart')) || [];
+window.cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
-let purchasedProducts = JSON.parse(localStorage.getItem('purchasedProducts')) || [];
+window.purchasedProducts = JSON.parse(localStorage.getItem('purchasedProducts')) || [];
 let products = [];
 let currentProductId = null;
 let selectedSize = null;
 
-// Адрес доставки
-let selectedPVZ = JSON.parse(localStorage.getItem('selectedPVZ')) || { city: '', address: '', details: '' };
+// Address
+window.selectedPVZ = JSON.parse(localStorage.getItem('selectedPVZ')) || { city: '', address: '', details: '' };
 
 const categories = [
   {id:'all',name:'Все'},{id:'designer',name:'Дизайнерские'},{id:'kids',name:'Детские'},
@@ -35,7 +35,7 @@ const categories = [
 // === 3. DB & RENDER ===
 function loadProducts() {
   try {
-    db.collection('products').get().then(snap => {
+    window.db.collection('products').get().then(snap => {
       products = [];
       snap.forEach(d => { const data = d.data(); data.id = d.id; products.push(data); });
       renderGrid('home-grid', products.slice(0,4));
@@ -109,25 +109,25 @@ window.selectSize = (btn, size) => {
 window.addToCartFromDetail = () => {
   if(!selectedSize) return alert('Выберите размер');
   const p = products.find(x => x.id === currentProductId);
-  cart.push({...p, size: selectedSize});
-  localStorage.setItem('cart',JSON.stringify(cart)); updateCart();
+  window.cart.push({...p, size: selectedSize});
+  localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart();
   alert('Добавлено');
 };
 window.addToCart = id => {
   const p = products.find(x => x.id === id);
-  const ex = cart.find(x => x.id === id);
-  if(ex) ex.qty++; else cart.push({...p, qty:1});
-  localStorage.setItem('cart',JSON.stringify(cart)); updateCart();
+  const ex = window.cart.find(x => x.id === id);
+  if(ex) ex.qty++; else window.cart.push({...p, qty:1});
+  localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart();
 };
 
 // === 6. CART ===
 const updateCart = () => {
-  const badge = document.getElementById('cart-badge'); if(badge) badge.textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
+  const badge = document.getElementById('cart-badge'); if(badge) badge.textContent = window.cart.reduce((s,i)=>s+(i.qty||1),0);
   const empty = document.getElementById('cart-empty'), layout = document.getElementById('cart-layout');
   if(!empty || !layout) return;
-  if(!cart.length){empty.style.display='block';layout.style.display='none';return;}
+  if(!window.cart.length){empty.style.display='block';layout.style.display='none';return;}
   empty.style.display='none';layout.style.display='grid';
-  document.getElementById('cart-items').innerHTML = cart.map((i,idx)=>`
+  document.getElementById('cart-items').innerHTML = window.cart.map((i,idx)=>`
     <div class="cart-item">
       <div class="cart-item-info">
         <div class="cart-item-name">${i.name}</div>
@@ -138,40 +138,40 @@ const updateCart = () => {
         </div>
       </div>
     </div>`).join('');
-  document.getElementById('cart-total').textContent = cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0).toLocaleString('ru')+' ₽';
+  document.getElementById('cart-total').textContent = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0).toLocaleString('ru')+' ₽';
 };
-window.changeQty = (idx,d) => { cart[idx].qty=(cart[idx].qty||1)+d; if(cart[idx].qty<1)cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCart(); };
-window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(cart)); updateCart(); };
+window.changeQty = (idx,d) => { window.cart[idx].qty=(window.cart[idx].qty||1)+d; if(window.cart[idx].qty<1)window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
+window.removeItem = idx => { window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 
 // === 7. ADDRESS / PVZ ===
 window.openPVZModal = () => {
-  document.getElementById('pvz-city').value = selectedPVZ.city || '';
-  document.getElementById('pvz-address').value = selectedPVZ.address || '';
-  document.getElementById('pvz-details').value = selectedPVZ.details || '';
+  document.getElementById('pvz-city').value = window.selectedPVZ.city || '';
+  document.getElementById('pvz-address').value = window.selectedPVZ.address || '';
+  document.getElementById('pvz-details').value = window.selectedPVZ.details || '';
   document.getElementById('pvz-modal').style.display = 'flex';
 };
 window.closePVZModal = () => { document.getElementById('pvz-modal').style.display = 'none'; };
 window.savePVZ = () => {
-  selectedPVZ.city = document.getElementById('pvz-city').value;
-  selectedPVZ.address = document.getElementById('pvz-address').value;
-  selectedPVZ.details = document.getElementById('pvz-details').value;
-  localStorage.setItem('selectedPVZ', JSON.stringify(selectedPVZ));
+  window.selectedPVZ.city = document.getElementById('pvz-city').value;
+  window.selectedPVZ.address = document.getElementById('pvz-address').value;
+  window.selectedPVZ.details = document.getElementById('pvz-details').value;
+  localStorage.setItem('selectedPVZ', JSON.stringify(window.selectedPVZ));
   alert('✅ Адрес сохранен');
   window.closePVZModal();
 };
 
 // === 8. CHECKOUT ===
 window.checkout = () => {
-  const user = auth.currentUser;
+  const user = window.auth.currentUser;
   if(!user) { window.navigate('profile'); return alert('Войдите в аккаунт'); }
-  if(!cart.length) return;
+  if(!window.cart.length) return;
   
-  const fullAddress = `${selectedPVZ.city || 'Не указан город'}, ${selectedPVZ.address || 'Не указан адрес'} ${selectedPVZ.details || ''}`;
-  const total = cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
+  const fullAddress = `${window.selectedPVZ.city || 'Не указан город'}, ${window.selectedPVZ.address || 'Не указан адрес'} ${window.selectedPVZ.details || ''}`;
+  const total = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
   
   const order = {
     id: Date.now(), user: user.email,
-    items: cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
+    items: window.cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
     total: total.toLocaleString('ru'), 
     address: fullAddress, 
     status: 'new', qrImage: '', date: new Date().toISOString()
@@ -179,18 +179,18 @@ window.checkout = () => {
   
   let orders = JSON.parse(localStorage.getItem('allOrders'))||[];
   orders.push(order); localStorage.setItem('allOrders', JSON.stringify(orders));
-  cart.forEach(it => { if(!purchasedProducts.some(p=>p.id===it.id && p.user===user.email)) purchasedProducts.push({id:it.id, user:user.email, date:new Date().toISOString()}); });
-  localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
+  window.cart.forEach(it => { if(!window.purchasedProducts.some(p=>p.id===it.id && p.user===user.email)) window.purchasedProducts.push({id:it.id, user:user.email, date:new Date().toISOString()}); });
+  localStorage.setItem('purchasedProducts', JSON.stringify(window.purchasedProducts));
   orderCount++; localStorage.setItem('orderCount', orderCount);
   alert('✅ Заказ оформлен: ' + fullAddress);
-  cart=[]; localStorage.setItem('cart','[]'); updateCart();
+  window.cart=[]; localStorage.setItem('cart','[]'); updateCart();
 };
 
 // === 9. ORDERS ===
 window.renderOrders = () => {
   const c = document.getElementById('my-orders-list'); if(!c) return;
   const orders = JSON.parse(localStorage.getItem('allOrders'))||[];
-  const user = auth.currentUser;
+  const user = window.auth.currentUser;
   const mine = user ? orders.filter(o => o.user === user.email).reverse() : [];
   c.innerHTML = mine.length ? mine.map(o => `
     <div style="background:var(--card);padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--border)">
@@ -210,11 +210,11 @@ function renderAdmin() {
   if(st) st.innerHTML = `<div class="stat-box"><span class="stat-num">${orders.length}</span><small>Заказов</small></div>`;
   c.innerHTML = orders.reverse().map(o => `
     <div class="order-row">
-      <div style="flex:1"><b>#${String(o.id).slice(-4)} | ${o.user?.split('@')[0]}</b><br><small>${o.items}</small><br><small style="color:var(--muted)">📍 ${o.address}</small>
-        <div style="margin-top:6px">${['new','assembling','shipping','delivered'].map(s=>`<button style="padding:4px 8px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};border-radius:4px;cursor:pointer;font-size:0.75rem" onclick="window.updateStatus(${o.id},'${s}')">${s}</button>`).join('')}</div>
+      <div style="flex:1;min-width:0"><b>#${String(o.id).slice(-4)} | ${o.user?.split('@')[0]}</b><br><small style="word-break:break-word">${o.items}</small><br><small style="color:var(--muted)">📍 ${o.address}</small>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${['new','assembling','shipping','delivered'].map(s=>`<button style="padding:4px 8px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};border-radius:4px;cursor:pointer;font-size:0.75rem" onclick="window.updateStatus(${o.id},'${s}')">${s}</button>`).join('')}</div>
         ${o.status==='delivered'?`<div style="margin-top:8px"><input type="file" id="qr-${o.id}" accept="image/*" style="display:none" onchange="window.uploadQR(${o.id},this)"><label for="qr-${o.id}" style="padding:4px 8px;background:var(--success);color:#fff;border-radius:4px;cursor:pointer;font-size:0.75rem">📷 QR</label></div>`:''}
       </div>
-      <div style="text-align:right"><b>${o.total} ₽</b></div>
+      <div style="text-align:right;min-width:80px"><b>${o.total} ₽</b></div>
     </div>`).join('');
 }
 window.updateStatus = (id, status) => {
@@ -235,22 +235,22 @@ window.uploadQR = (id, input) => {
 
 // === 11. HYBRID CHAT (CLIENT FAQ + ADMIN COMMANDS) ===
 const botCommands = {
-  '/test': () => '✅ Бот работает. Вы админ: ' + (ADMIN_EMAILS.includes(auth.currentUser?.email) ? 'Да' : 'Нет'),
+  '/test': () => '✅ Бот работает. Вы админ: ' + (ADMIN_EMAILS.includes(window.auth.currentUser?.email) ? 'Да' : 'Нет'),
   '/stats': () => {
-    if(!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 Только админам';
+    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Только админам';
     const orders = JSON.parse(localStorage.getItem('allOrders')||'[]');
     const rev = orders.reduce((s,o)=>s+parseFloat(o.total)||0,0);
     return `📊 Заказов: ${orders.length}\n💰 Выручка: ${rev.toLocaleString('ru')} ₽\n🛍️ Товаров: ${products.length}`;
   },
   '/add': async (args) => {
-    if(!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 Только админам';
+    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Только админам';
     const p = args.split('|').map(x=>x.trim());
     if(p.length<5) return '❌ Формат: /add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2';
     const [name, price, cat, sizes, desc, imgs] = p;
     const images = imgs ? imgs.split(',').map(u=>u.trim()).filter(u=>u.startsWith('http')) : ['👟'];
     if(images.length===0) images.push('👟');
     try {
-      await db.collection('products').add({name, price: Number(price), category: cat, sizes: sizes.split(',').map(s=>s.trim()), desc, images, rating:5, reviews:0, createdAt:new Date().toISOString()});
+      await window.db.collection('products').add({name, price: Number(price), category: cat, sizes: sizes.split(',').map(s=>s.trim()), desc, images, rating:5, reviews:0, createdAt:new Date().toISOString()});
       return `✅ ${name} добавлен в каталог`;
     } catch(e) { return `❌ ${e.message}`; }
   },
@@ -281,7 +281,7 @@ window.sendChatMessage = () => {
   box.innerHTML += `<div class="msg user">${txt}</div>`; inp.value=''; box.scrollTop=box.scrollHeight;
   
   // Admin Commands
-  if(txt.startsWith('/') && auth.currentUser && ADMIN_EMAILS.includes(auth.currentUser.email)) {
+  if(txt.startsWith('/') && window.auth.currentUser && ADMIN_EMAILS.includes(window.auth.currentUser.email)) {
     const m = txt.match(/^\/(\w+)\s*(.*)?$/);
     if(m) {
       const cmd = '/' + m[1].toLowerCase(); const args = m[2]||'';
@@ -335,8 +335,8 @@ if(authForm) {
     err.style.display='none'; btn.disabled=true; btn.textContent='...';
     
     try {
-      if(isLogin) await auth.signInWithEmailAndPassword(em, pw);
-      else await auth.createUserWithEmailAndPassword(em, pw);
+      if(isLogin) await window.auth.signInWithEmailAndPassword(em, pw);
+      else await window.auth.createUserWithEmailAndPassword(em, pw);
       console.log('[AUTH] Успех');
     } catch(e) {
       console.error('[AUTH] Ошибка:', e.code);
@@ -353,7 +353,7 @@ if(authForm) {
     }
   };
 
-  auth.onAuthStateChanged(user => {
+  window.auth.onAuthStateChanged(user => {
     console.log('[AUTH] Статус:', user ? user.email : 'Гость');
     if(user) {
       document.getElementById('auth-flow').style.display='none';
@@ -372,7 +372,7 @@ if(authForm) {
   });
   
   document.getElementById('logout-btn').onclick = () => {
-    auth.signOut();
+    window.auth.signOut();
     console.log('[AUTH] Выход');
   };
 }

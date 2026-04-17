@@ -4,6 +4,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg
 a{text-decoration:none;color:inherit}
 .container{max-width:1100px;margin:0 auto;padding:0 16px}
 
+/* HEADER & NAV */
 .header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border)}
 .header-inner{height:56px;display:flex;align-items:center;gap:12px;padding:0 16px}
 .logo{font-weight:800;font-size:1.25rem;color:var(--primary);cursor:pointer}
@@ -12,15 +13,16 @@ a{text-decoration:none;color:inherit}
 .search-wrap input{flex:1;border:none;background:none;padding:10px 0;font-size:0.95rem;outline:none}
 .cart-btn{position:relative;background:none;border:none;font-size:1.3rem;cursor:pointer}
 #cart-badge{position:absolute;top:-4px;right:-6px;background:var(--primary);color:#fff;font-size:0.65rem;padding:2px 5px;border-radius:10px}
-
 .categories-nav{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 0;overflow-x:auto;white-space:nowrap}
 .cat-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:20px;cursor:pointer;margin-right:6px;font-size:0.85rem}
 .cat-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 
+/* PAGES */
 .page{display:none;padding:16px 0;animation:fade 0.2s ease}
 .page.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
+/* HOME */
 .promo-banner{background:linear-gradient(135deg,#005bff,#0033cc);color:#fff;border-radius:var(--radius);padding:20px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;margin-bottom:20px}
 .promo-tag{background:rgba(255,255,255,0.2);padding:4px 8px;border-radius:6px;font-size:0.75rem;font-weight:600;display:inline-block;margin-bottom:8px}
 .promo-text h1{font-size:1.6rem;line-height:1.2;margin-bottom:12px}
@@ -28,6 +30,7 @@ a{text-decoration:none;color:inherit}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin:16px 0 12px}
 .section-header h2{font-size:1.2rem;font-weight:700}
 
+/* GRID */
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 @media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr)}}
 .card{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
@@ -40,6 +43,7 @@ a{text-decoration:none;color:inherit}
 .card-price .now{font-weight:700;font-size:1.1rem}
 .btn-cart{width:100%;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;margin-top:8px}
 
+/* PRODUCT */
 .back-btn{background:none;border:none;color:var(--primary);font-size:0.95rem;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .product-detail{display:grid;gap:16px;margin-bottom:24px}
 .product-media{background:#f0f0f0;border-radius:var(--radius);aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:5rem;overflow:hidden}
@@ -56,6 +60,7 @@ a{text-decoration:none;color:inherit}
 .size-btn{width:44px;height:44px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-weight:600;cursor:pointer}
 .size-btn.active{border-color:var(--primary);color:var(--primary);background:rgba(0,91,255,0.1)}
 
+/* CART */
 .cart-layout{display:grid;gap:16px}
 @media(min-width:768px){.cart-layout{grid-template-columns:1fr 320px}}
 .cart-item{background:var(--card);padding:12px;border-radius:var(--radius);display:flex;gap:12px;margin-bottom:10px;box-shadow:var(--shadow)}
@@ -68,6 +73,7 @@ a{text-decoration:none;color:inherit}
 .summary-row{display:flex;justify-content:space-between;margin-bottom:8px}
 .summary-row.total{font-size:1.2rem;font-weight:700;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
 
+/* PROFILE */
 .profile-header{background:var(--surface);padding:24px 16px;text-align:center;border-bottom:1px solid var(--border);margin-bottom:16px}
 .avatar-wrap{width:70px;height:70px;background:var(--bg);border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:2rem}
 .menu-grid{display:grid;gap:8px;margin-bottom:16px}
@@ -82,11 +88,14 @@ a{text-decoration:none;color:inherit}
 .input:focus{border-color:var(--primary);outline:none}
 .error{color:var(--danger);font-size:0.85rem;margin-bottom:10px;padding:8px;background:rgba(255,59,48,0.1);border-radius:6px}
 
+/* ADMIN */
 .admin-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
 .stat-box{background:var(--card);padding:12px;border-radius:10px;text-align:center;border:1px solid var(--border)}
 .stat-num{display:block;font-size:1.5rem;font-weight:700;color:var(--primary)}
+.admin-card{background:var(--card);padding:16px;border-radius:var(--radius);box-shadow:var(--shadow)}
 .order-row{background:var(--card);padding:12px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:start;border:1px solid var(--border)}
 
+/* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:10px 0 max(8px,env(safe-area-inset-bottom));z-index:100}
 .nav-item{background:none;border:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;font-size:0.7rem;cursor:pointer}
 .nav-item i{font-size:1.3rem;margin-bottom:2px}
