@@ -20,7 +20,7 @@ const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
 window.cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
 window.purchasedProducts = JSON.parse(localStorage.getItem('purchasedProducts')) || [];
-let products = [];
+let products = []; // Глобальный массив товаров
 let currentProductId = null;
 let selectedSize = null;
 window.selectedPVZ = JSON.parse(localStorage.getItem('selectedPVZ')) || { city: '', address: '', details: '' };
@@ -34,6 +34,7 @@ const categories = [
 function seedTestProduct() {
   window.db.collection('products').get().then(snap => {
     if(snap.empty) {
+      console.log("[DB] Добавляем тестовый товар...");
       window.db.collection('products').add({
         name: "Nike Air Max 97 Silver", price: 14990, category: "designer",
         sizes: ["39","40","41","42","43","44"],
@@ -46,21 +47,34 @@ function seedTestProduct() {
   });
 }
 
-// === 4. DB & RENDER ===
+// === 4. LIVE PRODUCT LOADER (ИСПРАВЛЕНО) ===
+// Теперь эта функция следит за базой в реальном времени
 function loadProducts() {
-  window.db.collection('products').get().then(snap => {
+  console.log("[DB] Запуск слушателя товаров...");
+  window.db.collection('products').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
     products = [];
-    snap.forEach(d => { const data = d.data(); data.id = d.id; products.push(data); });
+    snapshot.forEach(d => { 
+      const data = d.data(); 
+      data.id = d.id; // Важно: сохраняем ID документа для редактирования
+      products.push(data); 
+    });
+    console.log(`[DB] Загружено ${products.length} товаров`);
+    
+    // Мгновенно обновляем сетки на сайте
     renderGrid('home-grid', products.slice(0,4));
     renderGrid('catalog-grid', products);
+  }, (error) => {
+    console.error("[DB] Ошибка слушателя:", error);
   });
 }
+
 const renderGrid = (id, list) => {
   const el = document.getElementById(id); if(!el) return;
   el.innerHTML = list.map(p => {
     const img = p.images?.[0] || '👟';
+    const imgHtml = img.startsWith('http') ? `<img src="${img}">` : img;
     return `<div class="card" onclick="window.openProduct('${p.id}')">
-      <div class="card-img">${img.startsWith('http')?`<img src="${img}">`:img}</div>
+      <div class="card-img">${imgHtml}</div>
       <div class="card-body">
         <div class="card-brand">${categories.find(c=>c.id===p.category)?.name||p.category}</div>
         <div class="card-name">${p.name}</div>
@@ -94,6 +108,7 @@ window.openProduct = id => {
   document.getElementById('detail-price').textContent = (p.price||0).toLocaleString('ru') + ' ₽';
   document.getElementById('detail-desc').textContent = p.desc || '';
   document.getElementById('sizes-container').innerHTML = (p.sizes||[]).map(s => `<button class="size-btn" onclick="window.selectSize(this,'${s}')">${s}</button>`).join('');
+  
   const thumbs = document.getElementById('product-thumbs'); thumbs.innerHTML = '';
   (p.images||[]).forEach((u,i) => {
     if(!u.startsWith('http')) return;
@@ -189,7 +204,7 @@ window.renderOrders = () => {
   });
 };
 
-// === 11. ADMIN DASHBOARD (FIXED + EDIT SYSTEM) ===
+// === 11. ADMIN DASHBOARD (FIXED) ===
 function showToast(msg){const t=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 function renderAdmin() {
@@ -201,26 +216,27 @@ function renderAdmin() {
     document.getElementById('stat-revenue').textContent=rev.toLocaleString('ru')+' ₽';
     document.getElementById('stat-users').textContent=users.size;
   });
-  window.db.collection('products').get().then(s=>document.getElementById('stat-products').textContent=s.size);
+  // Products count is handled by listener now, but we can trigger admin list render
+  renderAdminProductsList();
+}
 
-  // Products List
+function renderAdminProductsList() {
   const list = document.getElementById('admin-products-list');
-  window.db.collection('products').orderBy('createdAt','desc').get().then(snap=>{
-    list.innerHTML = snap.empty ? '<p style="color:var(--muted)">Товаров нет</p>' : snap.docs.map(doc=>{
-      const p=doc.data();
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border)">
-        <div><b>${p.name}</b><br><small>${(p.price||0).toLocaleString('ru')} ₽ • ${p.category}</small></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn" style="padding:6px 10px;font-size:0.8rem;background:var(--bg);border:1px solid var(--border)" onclick="window.editProduct('${doc.id}')">✏️ Изменить</button>
-          <button class="btn" style="padding:6px 10px;font-size:0.8rem;background:rgba(220,53,69,0.1);color:var(--danger);border:1px solid rgba(220,53,69,0.2)" onclick="window.deleteProduct('${doc.id}')">🗑 Удалить</button>
-        </div>
-      </div>`;
-    }).join('');
-  });
+  // Используем глобальный массив products, который обновляется в реальном времени
+  if(!list) return;
+  list.innerHTML = products.length === 0 ? '<p style="color:var(--muted)">Товаров нет</p>' : products.map(p => {
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border)">
+      <div><b>${p.name}</b><br><small>${(p.price||0).toLocaleString('ru')} ₽ • ${p.category}</small></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="padding:6px 10px;font-size:0.8rem;background:var(--bg);border:1px solid var(--border)" onclick="window.editProduct('${p.id}')">✏️ Изменить</button>
+        <button class="btn" style="padding:6px 10px;font-size:0.8rem;background:rgba(220,53,69,0.1);color:var(--danger);border:1px solid rgba(220,53,69,0.2)" onclick="window.deleteProduct('${p.id}')">🗑 Удалить</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 window.saveProduct = async () => {
-  console.log("[ADMIN] Сохранение товара...");
+  console.log("[ADMIN] Попытка сохранения...");
   const btn = document.getElementById('prod-submit-btn');
   const editId = document.getElementById('edit-prod-id').value;
   const name = document.getElementById('new-prod-name').value.trim();
@@ -246,10 +262,10 @@ window.saveProduct = async () => {
       prodData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       prodData.rating = 5.0; prodData.reviews = 0;
       await window.db.collection('products').add(prodData);
-      showToast('✅ Товар опубликован');
+      showToast('✅ Товар опубликован в каталоге');
     }
     window.cancelEdit();
-    renderAdmin(); loadProducts();
+    // renderAdminProductsList() вызовется автоматически через loadProducts (onSnapshot)
   } catch(e) {
     console.error(e);
     alert('❌ Ошибка сохранения: ' + e.message);
@@ -260,22 +276,22 @@ window.saveProduct = async () => {
 };
 
 window.editProduct = (id) => {
-  window.db.collection('products').doc(id).get().then(doc=>{
-    if(!doc.exists) return;
-    const p = doc.data();
-    document.getElementById('edit-prod-id').value = id;
-    document.getElementById('new-prod-name').value = p.name||'';
-    document.getElementById('new-prod-price').value = p.price||'';
-    document.getElementById('new-prod-cat').value = p.category||'designer';
-    document.getElementById('new-prod-sizes').value = (p.sizes||[]).join(',');
-    document.getElementById('new-prod-img').value = (p.images?.[0]?.startsWith('http')) ? p.images[0] : '';
-    document.getElementById('new-prod-desc').value = p.desc||'';
-    document.getElementById('form-title').textContent = '✏️ Редактирование товара';
-    const btn = document.getElementById('prod-submit-btn');
-    btn.textContent = '💾 Сохранить изменения';
-    document.getElementById('cancel-edit-btn').style.display = 'block';
-    window.scrollTo({top:0, behavior:'smooth'});
-  });
+  const p = products.find(x => x.id === id);
+  if(!p) return alert('Товар не найден');
+  
+  document.getElementById('edit-prod-id').value = id;
+  document.getElementById('new-prod-name').value = p.name||'';
+  document.getElementById('new-prod-price').value = p.price||'';
+  document.getElementById('new-prod-cat').value = p.category||'designer';
+  document.getElementById('new-prod-sizes').value = (p.sizes||[]).join(',');
+  document.getElementById('new-prod-img').value = (p.images?.[0]?.startsWith('http')) ? p.images[0] : '';
+  document.getElementById('new-prod-desc').value = p.desc||'';
+  
+  document.getElementById('form-title').textContent = '✏️ Редактирование товара';
+  const btn = document.getElementById('prod-submit-btn');
+  btn.textContent = '💾 Сохранить изменения';
+  document.getElementById('cancel-edit-btn').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
 };
 
 window.cancelEdit = () => {
@@ -288,9 +304,10 @@ window.cancelEdit = () => {
 };
 
 window.deleteProduct = (id) => {
-  if(!confirm('🗑 Удалить этот товар из каталога? Это действие нельзя отменить.')) return;
+  if(!confirm('🗑 Удалить этот товар из каталога?')) return;
   window.db.collection('products').doc(id).delete().then(()=>{
-    showToast('🗑 Товар удалён'); renderAdmin(); loadProducts();
+    showToast('🗑 Товар удалён'); 
+    // onSnapshot обновит список автоматически
   });
 };
 
@@ -362,4 +379,6 @@ if(authForm){
 }
 
 // === 14. INIT ===
-seedTestProduct(); loadProducts(); updateCart();
+seedTestProduct(); 
+loadProducts(); // Запускает LIVE-режим
+updateCart();
