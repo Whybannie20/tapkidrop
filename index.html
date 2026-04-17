@@ -17,13 +17,12 @@
 </head>
 <body>
 
-  <!-- HEADER -->
   <header class="app-header">
     <div class="header-inner">
       <div class="logo" onclick="window.navigate('home')">ТАПКИ<span>ДРОП</span></div>
       <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="search-input" placeholder="Поиск...">
+        <input type="text" id="search-input" placeholder="Поиск кроссовок...">
       </div>
       <button class="cart-btn" onclick="window.navigate('cart')">
         <i class="fa-solid fa-bag-shopping"></i><span id="cart-badge">0</span>
@@ -31,7 +30,6 @@
     </div>
   </header>
 
-  <!-- CATEGORIES -->
   <nav class="categories-nav">
     <div class="container">
       <button class="cat-btn active" data-cat="all">Все</button>
@@ -44,14 +42,13 @@
   </nav>
 
   <main class="app-main">
-    <!-- HOME -->
     <section id="home" class="page active">
       <div class="container">
         <div class="promo-banner">
           <div class="promo-text">
             <span class="promo-tag">🔥 DROP 2026</span>
             <h1>Стиль без компромиссов</h1>
-            <button class="btn btn--primary" onclick="window.navigate('catalog')">В каталог</button>
+            <button class="btn btn--primary" onclick="window.navigate('catalog')">Перейти в каталог</button>
           </div>
           <div class="promo-img">👟</div>
         </div>
@@ -60,103 +57,89 @@
       </div>
     </section>
 
-    <!-- CATALOG -->
     <section id="catalog" class="page">
       <div class="container"><div class="grid" id="catalog-grid"></div></div>
     </section>
 
-    <!-- PRODUCT -->
     <section id="product" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.navigate('catalog')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
+        <button class="back-btn" onclick="window.navigate('catalog')"><i class="fa-solid fa-arrow-left"></i> Назад в каталог</button>
         <div class="product-detail">
           <div class="product-media"><div class="main-img" id="detail-img">👟</div></div>
           <div id="product-thumbs" class="thumbs-row"></div>
           <div class="product-info">
-            <div class="brand" id="detail-brand">BRAND</div>
-            <h1 id="detail-name">Name</h1>
+            <div class="brand" id="detail-brand">БРЕНД</div>
+            <h1 id="detail-name">Название</h1>
             <div class="price-block"><span class="current" id="detail-price">0 ₽</span></div>
             <p id="detail-desc" class="desc"></p>
             <div class="sizes" id="sizes-container"></div>
-            <button class="btn btn--primary full" onclick="window.addToCartFromDetail()">В корзину</button>
+            <button class="btn btn--primary full" onclick="window.addToCartFromDetail()">Добавить в корзину</button>
           </div>
         </div>
-        <div class="reviews-section"><h3>Отзывы</h3><div class="reviews-list" id="reviews-list"></div></div>
+        <div class="reviews-section"><h3>Отзывы покупателей</h3><div class="reviews-list" id="reviews-list"></div></div>
       </div>
     </section>
 
-    <!-- CART -->
     <section id="cart" class="page">
       <div class="container">
         <h1 class="page-title">Корзина</h1>
-        <div id="cart-empty" style="display:none;text-align:center;padding:40px"><p>Пусто</p><button class="btn btn--primary" onclick="window.navigate('catalog')">В каталог</button></div>
+        <div id="cart-empty" style="display:none;text-align:center;padding:40px"><p>В корзине пока пусто</p><button class="btn btn--primary" onclick="window.navigate('catalog')">Перейти в каталог</button></div>
         <div class="cart-layout" id="cart-layout" style="display:none">
           <div class="cart-items" id="cart-items"></div>
           <div class="cart-summary">
-            <div class="summary-row total"><span>Итого</span><span id="cart-total">0 ₽</span></div>
-            <button class="btn btn--primary full" onclick="window.checkout()">Оформить</button>
+            <div class="summary-row total"><span>Итого к оплате</span><span id="cart-total">0 ₽</span></div>
+            <button class="btn btn--primary full" onclick="window.checkout()">Оформить заказ</button>
+            <p style="font-size:0.8rem;color:var(--muted);text-align:center;margin-top:8px">🔒 Безопасная оплата. Гарантия возврата 14 дней.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- MY ORDERS -->
     <section id="my-orders" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
+        <button class="back-btn" onclick="window.navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Назад в профиль</button>
         <h1 class="page-title">Мои заказы</h1>
         <div id="my-orders-list"></div>
       </div>
     </section>
 
-    <!-- PROFILE -->
     <section id="profile" class="page">
       <div class="profile-header">
         <div class="avatar-wrap"><div class="avatar">👤</div></div>
         <h2 id="profile-display-name">Гость</h2>
-        <p id="profile-email">Войдите</p>
+        <p id="profile-email">Войдите в аккаунт</p>
       </div>
       <div class="container">
         <div class="menu-grid">
           <div class="menu-item" onclick="window.navigate('my-orders')"><i class="fa-solid fa-bag-shopping"></i><span>Мои заказы</span><i class="fa-solid fa-chevron-right"></i></div>
-          
-          <!-- PVZ BUTTON -->
-          <div class="menu-item" onclick="window.openPVZModal()">
-            <i class="fa-solid fa-location-dot"></i>
-            <span>Адрес доставки</span>
-            <i class="fa-solid fa-chevron-right"></i>
-          </div>
-
-          <!-- SUPPORT BUTTON -->
-          <div class="menu-item" onclick="window.openSupportChat()"><i class="fa-solid fa-headset"></i><span>Поддержка</span><i class="fa-solid fa-chevron-right"></i></div>
+          <div class="menu-item" onclick="window.openPVZModal()"><i class="fa-solid fa-location-dot"></i><span>Адрес доставки</span><i class="fa-solid fa-chevron-right"></i></div>
+          <div class="menu-item" onclick="window.openSupportChat()"><i class="fa-solid fa-headset"></i><span>Служба поддержки</span><i class="fa-solid fa-chevron-right"></i></div>
         </div>
         <div id="auth-flow">
           <div class="auth-card">
-            <div class="tabs"><button class="tab active" data-tab="login">Вход</button><button class="tab" data-tab="register">Рег</button></div>
+            <div class="tabs"><button class="tab active" data-tab="login">Вход</button><button class="tab" data-tab="register">Регистрация</button></div>
             <form id="auth-form">
-              <input type="email" id="email-input" placeholder="Email" class="input" required>
+              <input type="email" id="email-input" placeholder="Электронная почта" class="input" required>
               <input type="password" id="pass-input" placeholder="Пароль" class="input" required>
               <div id="auth-error" class="error" style="display:none"></div>
               <button type="submit" class="btn btn--primary full" id="auth-submit">Войти</button>
             </form>
           </div>
         </div>
-        <div id="profile-actions" style="display:none"><button id="logout-btn" class="btn btn--danger full">Выйти</button></div>
+        <div id="profile-actions" style="display:none"><button id="logout-btn" class="btn btn--danger full">Выйти из аккаунта</button></div>
       </div>
     </section>
 
-    <!-- ADMIN -->
     <section id="admin" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
-        <h1>Админка</h1>
+        <button class="back-btn" onclick="window.navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Назад в профиль</button>
+        <h1>Панель управления</h1>
         <div id="admin-stats" class="admin-stats"></div>
-        <div class="admin-grid"><div class="admin-card"><h3>Заказы</h3><div id="orders-list-admin"></div></div></div>
+        <div class="admin-grid"><div class="admin-card"><h3>Все заказы</h3><div id="orders-list-admin"></div></div></div>
       </div>
     </section>
   </main>
 
-  <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="nav-item active" data-target="home"><i class="fa-solid fa-house"></i><span>Главная</span></button>
     <button class="nav-item" data-target="catalog"><i class="fa-solid fa-store"></i><span>Каталог</span></button>
@@ -164,29 +147,29 @@
     <button class="nav-item" data-target="profile"><i class="fa-regular fa-user"></i><span>Профиль</span></button>
   </nav>
 
-  <!-- FULLSCREEN SUPPORT MODAL -->
+  <!-- ПОЛНОЭКРАННАЯ ПОДДЕРЖКА -->
   <div id="support-modal" class="support-fullscreen" style="display:none">
     <div class="support-header">
       <button onclick="window.closeSupportChat()" style="background:none;border:none;color:#fff;font-size:1.2rem;padding:10px">✕</button>
-      <h3 style="margin:0;color:#fff;font-size:1.1rem">Поддержка</h3>
+      <h3 style="margin:0;color:#fff;font-size:1.1rem">Служба поддержки</h3>
       <div style="width:40px"></div>
     </div>
     <div class="support-body" id="chat-messages"></div>
     <div class="support-footer">
-      <input type="text" id="chat-input" placeholder="Введите вопрос или команду...">
+      <input type="text" id="chat-input" placeholder="Напишите вопрос или команду...">
       <button onclick="window.sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
   </div>
 
-  <!-- PVZ / ADDRESS MODAL -->
+  <!-- МОДАЛЬНОЕ ОКНО АДРЕСА -->
   <div id="pvz-modal" class="pvz-modal" style="display:none">
     <div class="pvz-content">
       <div class="pvz-header"><h3>Адрес доставки</h3><button onclick="window.closePVZModal()">✕</button></div>
       <div style="padding:16px">
-        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Куда отправить заказ? (ПВЗ или курьер)</p>
-        <input type="text" id="pvz-city" placeholder="Город (напр. Москва)" class="input">
-        <input type="text" id="pvz-address" placeholder="Адрес (напр. ул. Ленина, 5)" class="input">
-        <input type="text" id="pvz-details" placeholder="Детали (напр. ПВЗ №12345)" class="input">
+        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Укажите, куда отправить заказ (ПВЗ или курьером):</p>
+        <input type="text" id="pvz-city" placeholder="Город (например: Москва)" class="input">
+        <input type="text" id="pvz-address" placeholder="Адрес (например: ул. Ленина, 5)" class="input">
+        <input type="text" id="pvz-details" placeholder="Детали (например: ПВЗ №12345)" class="input">
         <button class="btn btn--primary full" onclick="window.savePVZ()">💾 Сохранить адрес</button>
       </div>
     </div>

@@ -9,11 +9,11 @@ try {
     appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
   };
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  window.auth = firebase.auth(); // Global window.auth for HTML access
+  window.auth = firebase.auth();
   window.db = firebase.firestore();
   window.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-  console.log("[FB] OK");
-} catch (e) { console.error("[FB] Init error:", e); }
+  console.log("[FB] Инициализация завершена");
+} catch (e) { console.error("[FB] Ошибка инициализации:", e); }
 
 // === 2. GLOBALS ===
 const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
@@ -24,7 +24,6 @@ let products = [];
 let currentProductId = null;
 let selectedSize = null;
 
-// Address
 window.selectedPVZ = JSON.parse(localStorage.getItem('selectedPVZ')) || { city: '', address: '', details: '' };
 
 const categories = [
@@ -40,9 +39,9 @@ function loadProducts() {
       snap.forEach(d => { const data = d.data(); data.id = d.id; products.push(data); });
       renderGrid('home-grid', products.slice(0,4));
       renderGrid('catalog-grid', products);
-      console.log("[DB] Loaded", products.length);
+      console.log("[DB] Загружено товаров:", products.length);
     });
-  } catch(e) { console.error("[DB] Load error", e); }
+  } catch(e) { console.error("[DB] Ошибка загрузки:", e); }
 }
 
 const renderGrid = (id, list) => {
@@ -107,11 +106,11 @@ window.selectSize = (btn, size) => {
   btn.classList.add('active'); selectedSize = size;
 };
 window.addToCartFromDetail = () => {
-  if(!selectedSize) return alert('Выберите размер');
+  if(!selectedSize) return alert('Пожалуйста, выберите размер');
   const p = products.find(x => x.id === currentProductId);
   window.cart.push({...p, size: selectedSize});
   localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart();
-  alert('Добавлено');
+  alert('✅ Товар добавлен в корзину');
 };
 window.addToCart = id => {
   const p = products.find(x => x.id === id);
@@ -131,7 +130,7 @@ const updateCart = () => {
     <div class="cart-item">
       <div class="cart-item-info">
         <div class="cart-item-name">${i.name}</div>
-        <div class="cart-item-meta">${(i.price||0).toLocaleString('ru')} ₽ • ${i.size||'?'}</div>
+        <div class="cart-item-meta">${(i.price||0).toLocaleString('ru')} ₽ • Размер ${i.size||'?'}</div>
         <div class="cart-controls">
           <button class="qty-btn" onclick="window.changeQty(${idx},-1)">−</button><span>${i.qty||1}</span><button class="qty-btn" onclick="window.changeQty(${idx},1)">+</button>
           <button style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer" onclick="window.removeItem(${idx})">🗑</button>
@@ -156,122 +155,184 @@ window.savePVZ = () => {
   window.selectedPVZ.address = document.getElementById('pvz-address').value;
   window.selectedPVZ.details = document.getElementById('pvz-details').value;
   localStorage.setItem('selectedPVZ', JSON.stringify(window.selectedPVZ));
-  alert('✅ Адрес сохранен');
+  alert('✅ Адрес успешно сохранён');
   window.closePVZModal();
 };
 
-// === 8. CHECKOUT ===
+// === 8. CHECKOUT (FIRESTORE ORDERS) ===
 window.checkout = () => {
   const user = window.auth.currentUser;
-  if(!user) { window.navigate('profile'); return alert('Войдите в аккаунт'); }
+  if(!user) { window.navigate('profile'); return alert('Для оформления заказа необходимо войти в аккаунт'); }
   if(!window.cart.length) return;
   
-  const fullAddress = `${window.selectedPVZ.city || 'Не указан город'}, ${window.selectedPVZ.address || 'Не указан адрес'} ${window.selectedPVZ.details || ''}`;
+  const fullAddress = `${window.selectedPVZ.city || 'Город не указан'}, ${window.selectedPVZ.address || 'Адрес не указан'} ${window.selectedPVZ.details || ''}`.replace(/,\s*,/g,',').trim();
   const total = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
   
-  const order = {
-    id: Date.now(), user: user.email,
-    items: window.cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
+  const orderData = {
+    userId: user.email,
+    userName: user.displayName || user.email.split('@')[0],
+    items: window.cart.map(i=>`${i.name} (${i.size||'?'})`).join(', '),
     total: total.toLocaleString('ru'), 
     address: fullAddress, 
-    status: 'new', qrImage: '', date: new Date().toISOString()
+    status: 'new', 
+    qrImage: '', 
+    date: new Date().toISOString(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   
-  let orders = JSON.parse(localStorage.getItem('allOrders'))||[];
-  orders.push(order); localStorage.setItem('allOrders', JSON.stringify(orders));
-  window.cart.forEach(it => { if(!window.purchasedProducts.some(p=>p.id===it.id && p.user===user.email)) window.purchasedProducts.push({id:it.id, user:user.email, date:new Date().toISOString()}); });
-  localStorage.setItem('purchasedProducts', JSON.stringify(window.purchasedProducts));
-  orderCount++; localStorage.setItem('orderCount', orderCount);
-  alert('✅ Заказ оформлен: ' + fullAddress);
-  window.cart=[]; localStorage.setItem('cart','[]'); updateCart();
+  window.db.collection('orders').add(orderData).then(() => {
+    window.cart.forEach(it => { 
+      if(!window.purchasedProducts.some(p=>p.id===it.id && p.user===user.email)) 
+        window.purchasedProducts.push({id:it.id, user:user.email, date:new Date().toISOString()}); 
+    });
+    localStorage.setItem('purchasedProducts', JSON.stringify(window.purchasedProducts));
+    orderCount++; localStorage.setItem('orderCount', orderCount);
+    alert('✅ Заказ успешно оформлен!\nАдрес: ' + fullAddress);
+    window.cart=[]; localStorage.setItem('cart','[]'); updateCart();
+  }).catch(err => alert('❌ Ошибка оформления: ' + err.message));
 };
 
-// === 9. ORDERS ===
+// === 9. ORDERS (REAL-TIME FIRESTORE) ===
+let ordersListener = null;
 window.renderOrders = () => {
   const c = document.getElementById('my-orders-list'); if(!c) return;
-  const orders = JSON.parse(localStorage.getItem('allOrders'))||[];
   const user = window.auth.currentUser;
-  const mine = user ? orders.filter(o => o.user === user.email).reverse() : [];
-  c.innerHTML = mine.length ? mine.map(o => `
-    <div style="background:var(--card);padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;font-weight:700"><span>#${String(o.id).slice(-4)}</span><span style="color:${o.status==='delivered'?'var(--success)':'orange'}">${o.status}</span></div>
-      <div style="font-size:0.8rem;color:var(--muted);margin:4px 0">📍 ${o.address}</div>
-      <div style="font-size:0.9rem;margin:6px 0">${o.items}</div>
-      <div style="font-weight:600">${o.total} ₽</div>
-      ${o.qrImage ? `<img src="${o.qrImage}" style="max-width:100%;margin-top:8px;border-radius:8px">` : ''}
-    </div>`).join('') : '<p style="text-align:center;color:var(--muted);padding:20px">Нет заказов</p>';
+  if(!user) { c.innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px">Войдите в аккаунт, чтобы видеть заказы</p>'; return; }
+  
+  if(ordersListener) ordersListener(); // Отписываемся от предыдущего
+  
+  ordersListener = window.db.collection('orders')
+    .where('userId', '==', user.email)
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(snap => {
+      if(snap.empty) {
+        c.innerHTML = '<p style="text-align:center;color:var(--muted);padding:30px">У вас пока нет заказов</p>';
+        return;
+      }
+      c.innerHTML = snap.docs.map(doc => {
+        const o = doc.data(); o.id = doc.id;
+        const statusMap = {new:'Ожидает',assembling:'В сборке',shipping:'В пути',delivered:'Доставлен'};
+        const statusClass = `status-${o.status}`;
+        const statusLabel = statusMap[o.status] || o.status;
+        
+        let qrHtml = '';
+        if(o.status === 'delivered' && o.qrImage) {
+          qrHtml = `<div class="qr-section">
+            <div class="qr-label">📱 Код для получения на пункте выдачи:</div>
+            <img src="${o.qrImage}" alt="Код получения" onerror="this.style.display='none'">
+            <p style="font-size:0.75rem;color:var(--muted);margin-top:6px">Покажите это фото сотруднику ПВЗ</p>
+          </div>`;
+        }
+        
+        return `<div class="order-card ${statusClass}">
+          <div class="order-head">
+            <span class="order-id">Заказ #${String(o.id).slice(-6).toUpperCase()}</span>
+            <span class="status-badge ${statusClass}">${statusLabel}</span>
+          </div>
+          <div class="order-body">
+            <div class="order-items">🛍️ ${o.items}</div>
+            <div>📍 ${o.address}</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-top:4px">📅 ${new Date(o.date).toLocaleDateString('ru-RU')}</div>
+          </div>
+          <div class="order-price">${o.total} ₽</div>
+          ${qrHtml}
+        </div>`;
+      }).join('');
+    }, err => {
+      console.error("Orders error:", err);
+      c.innerHTML = '<p style="color:var(--danger);text-align:center;padding:20px">Ошибка загрузки заказов</p>';
+    });
 };
 
 // === 10. ADMIN ===
 function renderAdmin() {
   const c = document.getElementById('orders-list-admin'); if(!c) return;
-  const orders = JSON.parse(localStorage.getItem('allOrders'))||[];
-  const st = document.getElementById('admin-stats');
-  if(st) st.innerHTML = `<div class="stat-box"><span class="stat-num">${orders.length}</span><small>Заказов</small></div>`;
-  c.innerHTML = orders.reverse().map(o => `
-    <div class="order-row">
-      <div style="flex:1;min-width:0"><b>#${String(o.id).slice(-4)} | ${o.user?.split('@')[0]}</b><br><small style="word-break:break-word">${o.items}</small><br><small style="color:var(--muted)">📍 ${o.address}</small>
-        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${['new','assembling','shipping','delivered'].map(s=>`<button style="padding:4px 8px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};border-radius:4px;cursor:pointer;font-size:0.75rem" onclick="window.updateStatus(${o.id},'${s}')">${s}</button>`).join('')}</div>
-        ${o.status==='delivered'?`<div style="margin-top:8px"><input type="file" id="qr-${o.id}" accept="image/*" style="display:none" onchange="window.uploadQR(${o.id},this)"><label for="qr-${o.id}" style="padding:4px 8px;background:var(--success);color:#fff;border-radius:4px;cursor:pointer;font-size:0.75rem">📷 QR</label></div>`:''}
-      </div>
-      <div style="text-align:right;min-width:80px"><b>${o.total} ₽</b></div>
-    </div>`).join('');
+  
+  // Отписываемся от старого слушателя если есть
+  if(window.adminOrdersListener) window.adminOrdersListener();
+  
+  window.adminOrdersListener = window.db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap => {
+    const st = document.getElementById('admin-stats');
+    if(st) st.innerHTML = `<div class="stat-box"><span class="stat-num">${snap.size}</span><small>Всего заказов</small></div>`;
+    
+    if(snap.empty) { c.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">Заказов пока нет</p>'; return; }
+    
+    c.innerHTML = snap.docs.map(doc => {
+      const o = doc.data(); o.id = doc.id;
+      return `<div class="order-row">
+        <div style="flex:1;min-width:0">
+          <b>#${String(o.id).slice(-6).toUpperCase()} | ${o.userName||o.userId?.split('@')[0]}</b><br>
+          <small style="word-break:break-word;color:var(--muted)">${o.items}</small><br>
+          <small style="color:var(--muted)">📍 ${o.address}</small>
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+            ${['new','assembling','shipping','delivered'].map(s=>`<button style="padding:5px 10px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500" onclick="window.updateStatus('${o.id}','${s}')">${s==='new'?'Новый':s==='assembling'?'Сборка':s==='shipping'?'Отправлен':'Доставлен'}</button>`).join('')}
+          </div>
+          ${o.status==='delivered'?`<div style="margin-top:10px"><input type="file" id="qr-${o.id}" accept="image/*" style="display:none" onchange="window.uploadQR('${o.id}',this)"><label for="qr-${o.id}" style="padding:6px 12px;background:var(--success);color:#fff;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500;display:inline-flex;align-items:center;gap:6px">📷 Загрузить фото/QR</label>${o.qrImage?'<span style="margin-left:8px;color:var(--success);font-size:0.8rem">✅ Загружено</span>':''}</div>`:''}
+        </div>
+        <div style="text-align:right;min-width:85px;font-weight:700">${o.total} ₽</div>
+      </div>`;
+    }).join('');
+  });
 }
+
 window.updateStatus = (id, status) => {
-  let orders = JSON.parse(localStorage.getItem('allOrders'))||[];
-  const o = orders.find(x => x.id === id);
-  if(o) { o.status = status; localStorage.setItem('allOrders', JSON.stringify(orders)); renderAdmin(); }
+  window.db.collection('orders').doc(id).update({ status })
+    .then(() => console.log(`Статус ${id} обновлён на ${status}`))
+    .catch(err => alert('Ошибка обновления: ' + err.message));
 };
+
 window.uploadQR = (id, input) => {
   const file = input.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    let orders = JSON.parse(localStorage.getItem('allOrders'))||[];
-    const o = orders.find(x => x.id === id);
-    if(o) { o.qrImage = e.target.result; localStorage.setItem('allOrders', JSON.stringify(orders)); alert('✅ QR сохранён'); renderAdmin(); }
+    window.db.collection('orders').doc(id).update({ qrImage: e.target.result })
+      .then(() => alert('✅ Фото/QR успешно сохранено. Клиент увидит его мгновенно.'))
+      .catch(err => alert('Ошибка загрузки: ' + err.message));
   };
   reader.readAsDataURL(file);
 };
 
-// === 11. HYBRID CHAT (CLIENT FAQ + ADMIN COMMANDS) ===
+// === 11. HYBRID CHAT (RUSSIAN FAQ + ADMIN) ===
 const botCommands = {
-  '/test': () => '✅ Бот работает. Вы админ: ' + (ADMIN_EMAILS.includes(window.auth.currentUser?.email) ? 'Да' : 'Нет'),
+  '/test': () => '✅ Связь работает. Вы администратор: ' + (ADMIN_EMAILS.includes(window.auth.currentUser?.email) ? 'Да' : 'Нет'),
   '/stats': () => {
-    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Только админам';
-    const orders = JSON.parse(localStorage.getItem('allOrders')||'[]');
-    const rev = orders.reduce((s,o)=>s+parseFloat(o.total)||0,0);
-    return `📊 Заказов: ${orders.length}\n💰 Выручка: ${rev.toLocaleString('ru')} ₽\n🛍️ Товаров: ${products.length}`;
+    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Доступно только администраторам';
+    return '📊 Статистика загружается из облака...';
   },
   '/add': async (args) => {
-    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Только админам';
+    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Только для администраторов';
     const p = args.split('|').map(x=>x.trim());
-    if(p.length<5) return '❌ Формат: /add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2';
+    if(p.length<5) return '❌ Неверный формат!\n\nИспользуйте:\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2\n\nПример:\n/add Yeezy 350 | 15000 | swag | 40,41,42,43 | Уличные кроссовки | https://img1.jpg, https://img2.jpg';
+    
     const [name, price, cat, sizes, desc, imgs] = p;
     const images = imgs ? imgs.split(',').map(u=>u.trim()).filter(u=>u.startsWith('http')) : ['👟'];
     if(images.length===0) images.push('👟');
+    
     try {
-      await window.db.collection('products').add({name, price: Number(price), category: cat, sizes: sizes.split(',').map(s=>s.trim()), desc, images, rating:5, reviews:0, createdAt:new Date().toISOString()});
-      return `✅ ${name} добавлен в каталог`;
-    } catch(e) { return `❌ ${e.message}`; }
+      await window.db.collection('products').add({name, price: Number(price), category: cat, sizes: sizes.split(',').map(s=>s.trim()), desc, images, rating:5, reviews:0, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+      return `✅ <b>${name}</b> успешно добавлен в каталог!\n💰 ${Number(price).toLocaleString('ru')} ₽ | 📏 ${sizes}`;
+    } catch(e) { return `❌ Ошибка базы данных: ${e.message}`; }
   },
-  '/help': () => '🤖 <b>Команды админа:</b>\n/stats — статистика\n/add Name|Price|Cat|Sizes|Desc|Img — добавить товар\n\n<b>Клиент:</b> просто напишите вопрос.'
+  '/help': () => '🤖 <b>Команды администратора:</b>\n\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2\n/stats — статистика заказов\n\n💡 Для клиентов: просто задайте вопрос на русском языке.'
 };
 
 const faqDB = {
-  'доставк|сроки|когда': '🚚 Доставка 1-3 дня. Бесплатно от 5000₽.',
-  'возврат|вернуть|деньги': '↩️ Возврат 14 дней. Курьер заберет бесплатно.',
-  'размер|маломерит|нога': '📏 Размеры по евро-сетке. Если между размерами — берите больше.',
-  'оплат|карт|сбер': '💳 Карты МИР, Visa, MC, СБП. Рассрочка есть.',
-  'промокод|скидк|купон': '🎁 Введите TAPKI2026 для скидки -15% в корзине.',
-  'качество|брак|материал': '👟 Только оригинал. Брак меняем за наш счет.',
-  'оператор|человек|живой': '👨‍ Оператор ответит в течение 5 минут.',
-  'адрес|пвз|где забрать': '📍 Адрес выберите в Профиле -> Адрес доставки.'
+  'доставк|сроки|когда придет|где мой': '🚚 Доставка по России занимает 1-3 рабочих дня. Бесплатно при заказе от 5000 ₽. Трек-номер придёт в SMS сразу после отправки.',
+  'возврат|вернуть|деньги назад|отказ|не понравился': '↩️ Возврат возможен в течение 14 дней, если товар не носился и сохранены бирки. Курьер заберёт заказ бесплатно.',
+  'размер|маломерит|большемерит|таблица|нога|полнота': '📏 Все размеры соответствуют европейской сетке. Если ваша стопа между размерами, рекомендуем взять на 0.5 размера больше.',
+  'оплат|карт|сбер|тинькофф|сбп|наложенный|рассрочка': '💳 Принимаем карты МИР, Visa, Mastercard и СБП. Доступна рассрочка от банков-партнёров на 3-6 месяцев без переплат.',
+  'промокод|скидк|купон|акци|бонус|баллы': '🎁 Введите код TAPKI2026 при оформлении для скидки -15%. Бонусы начисляются за отзывы и повторные заказы.',
+  'качество|брак|материал|оригинал|подделка': '👟 Мы работаем только с проверенными поставщиками. Все партии проходят контроль качества. При обнаружении брака заменим пару за наш счёт.',
+  'обмен|другой размер|цвет|подобрать|не подошел': '🔄 Обмен размера или цвета возможен в течение 7 дней. Просто оформите возврат и создайте новый заказ.',
+  'оператор|человек|живой|связ|жалоб|проблем|не работает': '👨‍ Оператор подключится к чату в течение 5 минут. Оставьте номер телефона, и мы перезвоним.',
+  'грязь|чистка|уход|подошва|стирк|вода|пятн': '🧼 Рекомендуем использовать специальную пену для кроссовок. Не стирайте обувь в машинке. Сушите при комнатной температуре.',
+  'подарок|упаковк|коробк|состояни|нов|следы носк': '🎁 Доставка осуществляется в фирменной коробке. По запросу добавим подарочный пакет (+199 ₽). Все пары новые.'
 };
 
 window.openSupportChat = () => {
   document.getElementById('support-modal').style.display = 'flex';
   const box = document.getElementById('chat-messages');
-  box.innerHTML = '<div class="msg bot">👋 Привет! Я помощник ТапкиДроп. Чем помочь?</div>';
+  box.innerHTML = '<div class="msg bot">👋 Здравствуйте! Я виртуальный помощник ТапкиДроп. Чем могу помочь?<br><br><small>💡 Администраторы: введите /help для списка команд</small></div>';
 };
 window.closeSupportChat = () => document.getElementById('support-modal').style.display = 'none';
 
@@ -287,7 +348,7 @@ window.sendChatMessage = () => {
       const cmd = '/' + m[1].toLowerCase(); const args = m[2]||'';
       setTimeout(async () => {
         const handler = botCommands[cmd];
-        box.innerHTML += `<div class="msg bot">${handler ? await handler(args) : '❌ Неизвестная команда'}</div>`;
+        box.innerHTML += `<div class="msg bot">${handler ? await handler(args) : '❌ Неизвестная команда. Введите /help'}</div>`;
         box.scrollTop=box.scrollHeight;
       }, 300);
       return;
@@ -301,9 +362,9 @@ window.sendChatMessage = () => {
     for(const [keys, ans] of Object.entries(faqDB)) {
       if(keys.split('|').some(k => lower.includes(k))) { reply = ans; break; }
     }
-    box.innerHTML += `<div class="msg bot">${reply || '🤔 Не совсем понял. Попробуйте переформулировать или нажмите "Оператор".'}</div>`;
+    box.innerHTML += `<div class="msg bot">${reply || '🤔 Я пока не понял ваш вопрос. Попробуйте переформулировать или нажмите кнопку ниже.'}</div>`;
     if(!reply) {
-       box.innerHTML += `<div class="msg bot" style="background:#e0e0e0;cursor:pointer" onclick="window.sendChatMessageDirect('Хочу к оператору')">👨‍ Связаться с оператором</div>`;
+       box.innerHTML += `<div class="msg bot" style="background:#e9ecef;cursor:pointer;margin-top:6px" onclick="window.sendChatMessageDirect('Хочу поговорить с оператором')">👨‍ Связаться с оператором</div>`;
     }
     box.scrollTop=box.scrollHeight;
   }, 500);
@@ -313,14 +374,14 @@ window.sendChatMessageDirect = (txt) => {
   window.sendChatMessage();
 };
 
-// === 12. AUTH (FIXED) ===
+// === 12. AUTH ===
 const authForm = document.getElementById('auth-form');
 if(authForm) {
   let isLogin = true;
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
     t.classList.add('active'); isLogin = t.dataset.tab==='login';
-    document.getElementById('auth-submit').textContent = isLogin ? 'Войти' : 'Регистрация';
+    document.getElementById('auth-submit').textContent = isLogin ? 'Войти' : 'Зарегистрироваться';
     document.getElementById('auth-error').style.display='none';
   });
 
@@ -331,49 +392,46 @@ if(authForm) {
     const btn = document.getElementById('auth-submit');
     const err = document.getElementById('auth-error');
     
-    console.log('[AUTH] Попытка:', em);
-    err.style.display='none'; btn.disabled=true; btn.textContent='...';
+    err.style.display='none'; btn.disabled=true; btn.textContent='Подождите...';
     
     try {
       if(isLogin) await window.auth.signInWithEmailAndPassword(em, pw);
       else await window.auth.createUserWithEmailAndPassword(em, pw);
-      console.log('[AUTH] Успех');
     } catch(e) {
-      console.error('[AUTH] Ошибка:', e.code);
       const msgs = {
-        'auth/user-not-found': 'Пользователь не найден.',
-        'auth/wrong-password': 'Неверный пароль.',
-        'auth/invalid-email': 'Неверный email.',
-        'auth/weak-password': 'Пароль мин. 6 символов.'
+        'auth/user-not-found': 'Пользователь с таким email не найден. Проверьте адрес или зарегистрируйтесь.',
+        'auth/wrong-password': 'Неверный пароль. Попробуйте снова или восстановите доступ.',
+        'auth/invalid-email': 'Некорректный формат email адреса.',
+        'auth/weak-password': 'Пароль должен содержать минимум 6 символов.'
       };
       err.textContent = msgs[e.code] || e.message;
       err.style.display='block';
     } finally {
-      btn.disabled=false; btn.textContent=isLogin?'Войти':'Регистрация';
+      btn.disabled=false; btn.textContent=isLogin?'Войти':'Зарегистрироваться';
     }
   };
 
   window.auth.onAuthStateChanged(user => {
-    console.log('[AUTH] Статус:', user ? user.email : 'Гость');
     if(user) {
       document.getElementById('auth-flow').style.display='none';
       document.getElementById('profile-actions').style.display='block';
       document.getElementById('profile-email').textContent = user.email;
+      document.getElementById('profile-display-name').textContent = user.displayName || user.email.split('@')[0];
       if(ADMIN_EMAILS.includes(user.email) && !document.getElementById('admin-link')) {
-        document.querySelector('.menu-grid').innerHTML += `<div class="menu-item" id="admin-link" onclick="window.navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админка</span><i class="fa-solid fa-chevron-right"></i></div>`;
+        document.querySelector('.menu-grid').innerHTML += `<div class="menu-item" id="admin-link" onclick="window.navigate('admin')"><i class="fa-solid fa-lock"></i><span>Панель управления</span><i class="fa-solid fa-chevron-right"></i></div>`;
       }
     } else {
       document.getElementById('auth-flow').style.display='block';
       document.getElementById('profile-actions').style.display='none';
       document.getElementById('profile-display-name').textContent='Гость';
-      document.getElementById('profile-email').textContent='Войдите';
+      document.getElementById('profile-email').textContent='Войдите в аккаунт';
       document.getElementById('admin-link')?.remove();
     }
   });
   
   document.getElementById('logout-btn').onclick = () => {
     window.auth.signOut();
-    console.log('[AUTH] Выход');
+    alert('✅ Вы успешно вышли из аккаунта');
   };
 }
 
