@@ -296,62 +296,45 @@ window.saveOrderQRImage = (id, input) => {
 };
 window.clearAllOrders=()=>{if(confirm('Удалить все заказы?')){localStorage.removeItem('allOrders');renderAdmin();}};
 
-// === SUPPORT CHAT & COMMANDS (FIXED) ===
+// === SUPPORT CHAT & COMMANDS (DEBUG MODE) ===
+window.ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
+
 const botCommands = {
-  '/stats': async () => {
-    if (!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) {
-      return '🔒 <b>Ошибка доступа:</b> Войдите в аккаунт админа (antoniobandero11@gmail.com или buldozer.mas12@gmail.com), чтобы видеть статистику.';
+  '/test': () => '✅ <b>Связь работает!</b> Бот видит ваши команды.',
+  '/stats': () => {
+    if (!auth.currentUser || !window.ADMIN_EMAILS.includes(auth.currentUser.email)) {
+      return '🔒 <b>Войдите как админ</b>, чтобы видеть статистику.';
     }
-    const allOrders = JSON.parse(localStorage.getItem('allOrders') || '[]');
-    const allUsers = [...new Set(allOrders.map(o => o.user))];
-    const totalRevenue = allOrders.reduce((sum, o) => sum + parseFloat(o.total.replace(/\s|₽/g, '')), 0);
-    return `📊 <b>Статистика сайта:</b>\n👥 Пользователи: ${allUsers.length}\n📦 Заказы: ${allOrders.length}\n💰 Выручка: ${totalRevenue.toLocaleString('ru')} ₽\n🛍️ Товаров в базе: ${products.length}`;
+    const orders = JSON.parse(localStorage.getItem('allOrders') || '[]');
+    const rev = orders.reduce((s, o) => s + parseFloat(o.total.replace(/\s|₽/g, '')) || 0, 0);
+    return `📊 <b>Статистика:</b>\n📦 Заказов: ${orders.length}\n💰 Выручка: ${rev.toLocaleString('ru')} ₽\n🛍️ Товаров: ${products.length}`;
   },
-
   '/add': async (args) => {
-    if (!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) {
-      return '🔒 <b>Ошибка доступа:</b> Войдите как админ, чтобы добавлять товары.';
-    }
+    if (!auth.currentUser || !window.ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 Требуется вход под админом.';
     const parts = args.split('|').map(p => p.trim());
-    if (parts.length < 5) return '❌ <b>Неверный формат!</b>\n\nИспользуйте:\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2\n\nПример:\n/add Yeezy 350 | 15000 | swag | 40,41,42,43 | Уличные кроссы | https://img1.jpg, https://img2.jpg';
-
+    if (parts.length < 5) return '❌ Формат:\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2';
+    
     const [name, priceStr, category, sizesStr, desc, imgsRaw] = parts;
     const price = Number(priceStr);
-    if (isNaN(price) || price <= 0) return '❌ Цена должна быть числом (например, 15000)';
-
-    const images = imgsRaw 
-      ? imgsRaw.split(',').map(url => url.trim()).filter(url => url.startsWith('http')) 
-      : ['👟'];
+    if (isNaN(price)) return '❌ Цена должна быть числом.';
+    
+    const images = imgsRaw ? imgsRaw.split(',').map(u => u.trim()).filter(u => u.startsWith('http')) : ['👟'];
     if (images.length === 0) images.push('👟');
-
-    const newProduct = {
-      name, price, category, 
-      sizes: sizesStr.split(',').map(s => s.trim()), 
-      desc, images,
-      rating: 5.0, reviews: 0,
-      createdAt: new Date().toISOString()
-    };
-
+    
     try {
-      await db.collection('products').add(newProduct);
-      return `✅ <b>${name}</b> успешно добавлен!\n💰 ${price.toLocaleString('ru')} ₽ | 📏 ${sizesStr}\n🖼️ Фото: ${images.length} шт.`;
-    } catch (e) {
-      return `❌ Ошибка базы данных: ${e.message}`;
-    }
+      await db.collection('products').add({
+        name, price, category, sizes: sizesStr.split(',').map(s => s.trim()), desc, images,
+        rating: 5.0, reviews: 0, createdAt: new Date().toISOString()
+      });
+      return `✅ <b>${name}</b> добавлен!\n💰 ${price.toLocaleString('ru')} ₽ | 📏 ${sizesStr}\n🖼️ Фото: ${images.length}`;
+    } catch (e) { return `❌ Ошибка базы: ${e.message}`; }
   },
-
-  '/help': () => `🤖 <b>Команды админа:</b>
-
-/add Название | Цена | Категория | Размеры | Описание | [Фото1, Фото2]
-Пример: /add Jordan 1 | 14990 | designer | 39,40,41 | Классика | https://link1.jpg, https://link2.jpg
-
-/stats — полная статистика
-/help — эта справка
-
-⚠️ Команды работают только если вы вошли как админ.`
+  '/help': () => `🤖 <b>Команды:</b>\n/test — проверка\n/stats — статистика\n/add — добавить товар\n\n⚠️ Нужен вход под админом.`
 };
 
-window.sendChatMessage = () => {
+// Глобальная функция для кнопки в HTML
+window.sendChatMessage = function() {
+  console.log('[CHAT] Кнопка нажата'); // Отладка
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
   if (!text) return;
@@ -361,72 +344,87 @@ window.sendChatMessage = () => {
   input.value = '';
   chatBox.scrollTop = chatBox.scrollHeight;
 
-  // Проверяем, начинается ли сообщение с /
   if (text.startsWith('/')) {
     const match = text.match(/^\/(\w+)\s*(.*)?$/);
     if (match) {
       const cmd = '/' + match[1].toLowerCase();
       const args = match[2] || '';
-      
+      console.log('[CHAT] Команда:', cmd);
+
       setTimeout(async () => {
         try {
-          if (botCommands[cmd]) {
-            const response = await botCommands[cmd](args);
-            chatBox.innerHTML += `<div class="msg bot">${response}</div>`;
+          const handler = botCommands[cmd];
+          if (handler) {
+            const res = await handler(args);
+            chatBox.innerHTML += `<div class="msg bot">${res}</div>`;
           } else {
-            chatBox.innerHTML += `<div class="msg bot">❌ Команда "${cmd}" не найдена. Введите /help</div>`;
+            chatBox.innerHTML += `<div class="msg bot">❌ Неизвестная команда. Введите /help</div>`;
           }
         } catch (err) {
-          chatBox.innerHTML += `<div class="msg bot">⚠️ Ошибка выполнения: ${err.message}</div>`;
-          console.error('Bot command error:', err);
+          console.error('[CHAT] Ошибка:', err);
+          chatBox.innerHTML += `<div class="msg bot">⚠️ Ошибка: ${err.message}</div>`;
         }
         chatBox.scrollTop = chatBox.scrollHeight;
-      }, 400);
+      }, 300);
       return;
     }
   }
-
-  // Если это не команда
+  
   setTimeout(() => {
-    chatBox.innerHTML += `<div class="msg bot">🤖 Я понимаю только команды. Введите /help для списка.</div>`;
+    chatBox.innerHTML += `<div class="msg bot">🤖 Я понимаю только команды. Введите /help</div>`;
     chatBox.scrollTop = chatBox.scrollHeight;
-  }, 500);
+  }, 400);
 };
 
-// Остальной код (Auth, Init) остается без изменений...
 // === AUTH ===
-const authForm=document.getElementById('auth-form'), emailIn=document.getElementById('email-input'), passIn=document.getElementById('pass-input'), authSub=document.getElementById('auth-submit'), authErr=document.getElementById('auth-error');
-let isLogin=true;
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active'); isLogin = t.dataset.tab==='login';
-  authSub.textContent = isLogin ? 'Войти' : 'Создать аккаунт'; authErr.style.display='none';
+const authForm = document.getElementById('auth-form');
+const emailIn = document.getElementById('email-input');
+const passIn = document.getElementById('pass-input');
+const authSub = document.getElementById('auth-submit');
+const authErr = document.getElementById('auth-error');
+let isLogin = true;
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active'); 
+  isLogin = t.dataset.tab === 'login';
+  authSub.textContent = isLogin ? 'Войти' : 'Создать аккаунт'; 
+  authErr.style.display = 'none';
 });
-authForm.onsubmit=async e=>{
-  e.preventDefault(); const em=emailIn.value.trim(), pw=passIn.value;
-  authErr.style.display='none'; authSub.disabled=true; authSub.textContent='...';
-  try { isLogin ? await auth.signInWithEmailAndPassword(em,pw) : await auth.createUserWithEmailAndPassword(em,pw); } 
-  catch(err) { authErr.textContent = err.message; authErr.style.display='block'; } 
-  finally { authSub.disabled=false; authSub.textContent=isLogin?'Войти':'Создать аккаунт'; }
+
+authForm.onsubmit = async e => {
+  e.preventDefault(); 
+  const em = emailIn.value.trim(), pw = passIn.value;
+  authErr.style.display = 'none'; authSub.disabled = true; authSub.textContent = '...';
+  try { 
+    isLogin ? await auth.signInWithEmailAndPassword(em, pw) : await auth.createUserWithEmailAndPassword(em, pw); 
+  } catch(err) { 
+    authErr.textContent = err.message; authErr.style.display = 'block'; 
+  } finally { 
+    authSub.disabled = false; authSub.textContent = isLogin ? 'Войти' : 'Создать аккаунт'; 
+  }
 };
+
 auth.onAuthStateChanged(user => {
-  if(user){
-    document.getElementById('auth-flow').style.display='none';
-    document.getElementById('profile-actions').style.display='block';
-    document.getElementById('profile-email').textContent=user.email;
-    if(isAdmin(user.email) && !document.getElementById('admin-link')){
-      document.querySelector('.menu-grid').innerHTML+=`<div class="menu-item" id="admin-link" onclick="navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админка</span></div>`;
+  console.log('[AUTH] Статус входа:', user ? user.email : 'Гость');
+  if (user) {
+    document.getElementById('auth-flow').style.display = 'none';
+    document.getElementById('profile-actions').style.display = 'block';
+    document.getElementById('profile-email').textContent = user.email;
+    if (window.ADMIN_EMAILS.includes(user.email) && !document.getElementById('admin-link')) {
+      document.querySelector('.menu-grid').innerHTML += `<div class="menu-item" id="admin-link" onclick="navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админка</span></div>`;
     }
   } else {
-    document.getElementById('auth-flow').style.display='block';
-    document.getElementById('profile-actions').style.display='none';
-    document.getElementById('profile-display-name').textContent='Гость';
-    document.getElementById('profile-email').textContent='Войдите';
+    document.getElementById('auth-flow').style.display = 'block';
+    document.getElementById('profile-actions').style.display = 'none';
+    document.getElementById('profile-display-name').textContent = 'Гость';
+    document.getElementById('profile-email').textContent = 'Войдите';
     document.getElementById('admin-link')?.remove();
   }
 });
-document.getElementById('logout-btn').onclick=()=>auth.signOut();
+document.getElementById('logout-btn').onclick = () => auth.signOut();
 
 // === INIT ===
 loadProductsFromDB();
 updateCartUI();
+console.log('[INIT] Скрипт запущен успешно');
