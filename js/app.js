@@ -1,21 +1,18 @@
-// === 1. FIREBASE INIT ===
-try {
-  const firebaseConfig = {
-    apiKey: "AIzaSyBv1oWzM9P_mCGIDNYpcj5SehNmtOjzaX0",
-    authDomain: "tapkidrop-7550b.firebaseapp.com",
-    projectId: "tapkidrop-7550b",
-    storageBucket: "tapkidrop-7550b.firebasestorage.app",
-    messagingSenderId: "804177130427",
-    appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
-  };
-  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-  console.log("[FB] OK");
-} catch (e) { console.error("[FB] Init error:", e); }
+// === 1. FIREBASE INIT (GLOBAL SCOPE) ===
+const firebaseConfig = {
+  apiKey: "AIzaSyBv1oWzM9P_mCGIDNYpcj5SehNmtOjzaX0",
+  authDomain: "tapkidrop-7550b.firebaseapp.com",
+  projectId: "tapkidrop-7550b",
+  storageBucket: "tapkidrop-7550b.firebasestorage.app",
+  messagingSenderId: "804177130427",
+  appId: "1:804177130427:web:7b78618f21590dc6c6ca9e"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth(); // ГЛОБАЛЬНО
+const db = firebase.firestore();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
-// === 2. GLOBALS ===
+// === 2. CONFIG & STATE ===
 const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
@@ -31,14 +28,13 @@ const categories = [
 
 // === 3. DB & RENDER ===
 function loadProducts() {
-  try {
-    db.collection('products').get().then(snap => {
-      products = [];
-      snap.forEach(d => { const data = d.data(); data.id = d.id; products.push(data); });
-      renderGrid('home-grid', products.slice(0,4));
-      renderGrid('catalog-grid', products);
-    });
-  } catch(e) { console.error("[DB] Load error", e); }
+  db.collection('products').get().then(snap => {
+    products = [];
+    snap.forEach(d => { const data = d.data(); data.id = d.id; products.push(data); });
+    renderGrid('home-grid', products.slice(0,4));
+    renderGrid('catalog-grid', products);
+    console.log(`[DB] Загружено товаров: ${products.length}`);
+  }).catch(err => console.error("[DB] Ошибка загрузки:", err));
 }
 
 const renderGrid = (id, list) => {
@@ -52,7 +48,7 @@ const renderGrid = (id, list) => {
       <div class="card-body">
         <div class="card-brand">${categories.find(c=>c.id===p.category)?.name||p.category}</div>
         <div class="card-name">${p.name}</div>
-        <div class="card-price"><span class="now">${p.price?.toLocaleString('ru')||0} ₽</span></div>
+        <div class="card-price"><span class="now">${(p.price||0).toLocaleString('ru')} ₽</span></div>
         <button class="btn-cart" onclick="event.stopPropagation(); window.addToCart('${p.id}')">В корзину</button>
       </div>
     </div>`;
@@ -127,10 +123,10 @@ const updateCart = () => {
     <div class="cart-item">
       <div class="cart-item-info">
         <div class="cart-item-name">${i.name}</div>
-        <div class="cart-item-meta">${i.price?.toLocaleString('ru')||0} ₽ • ${i.size||'?'}</div>
+        <div class="cart-item-meta">${(i.price||0).toLocaleString('ru')} ₽ • ${i.size||'?'}</div>
         <div class="cart-controls">
-          <button class="qty-btn" onclick="changeQty(${idx},-1)">−</button><span>${i.qty||1}</span><button class="qty-btn" onclick="changeQty(${idx},1)">+</button>
-          <button style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer" onclick="removeItem(${idx})">🗑</button>
+          <button class="qty-btn" onclick="window.changeQty(${idx},-1)">−</button><span>${i.qty||1}</span><button class="qty-btn" onclick="window.changeQty(${idx},1)">+</button>
+          <button style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer" onclick="window.removeItem(${idx})">🗑</button>
         </div>
       </div>
     </div>`).join('');
@@ -141,17 +137,18 @@ window.removeItem = idx => { cart.splice(idx,1); localStorage.setItem('cart',JSO
 
 // === 7. CHECKOUT ===
 window.checkout = () => {
-  if(!firebase.auth().currentUser) { window.navigate('profile'); return alert('Войдите'); }
+  const user = auth.currentUser;
+  if(!user) { window.navigate('profile'); return alert('Войдите в аккаунт'); }
   if(!cart.length) return;
   const total = cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
   const order = {
-    id: Date.now(), user: firebase.auth().currentUser.email,
+    id: Date.now(), user: user.email,
     items: cart.map(i=>`${i.name} (${i.size||''})`).join(', '),
     total: total.toLocaleString('ru'), address: 'Не указан', status: 'new', qrImage: '', date: new Date().toISOString()
   };
   let orders = JSON.parse(localStorage.getItem('allOrders'))||[];
   orders.push(order); localStorage.setItem('allOrders', JSON.stringify(orders));
-  cart.forEach(it => { if(!purchasedProducts.some(p=>p.id===it.id && p.user===order.user)) purchasedProducts.push({id:it.id, user:order.user, date:new Date().toISOString()}); });
+  cart.forEach(it => { if(!purchasedProducts.some(p=>p.id===it.id && p.user===user.email)) purchasedProducts.push({id:it.id, user:user.email, date:new Date().toISOString()}); });
   localStorage.setItem('purchasedProducts', JSON.stringify(purchasedProducts));
   orderCount++; localStorage.setItem('orderCount', orderCount);
   alert('✅ Заказ оформлен');
@@ -162,10 +159,11 @@ window.checkout = () => {
 window.renderOrders = () => {
   const c = document.getElementById('my-orders-list'); if(!c) return;
   const orders = JSON.parse(localStorage.getItem('allOrders'))||[];
-  const mine = orders.filter(o => o.user === firebase.auth().currentUser?.email).reverse();
+  const user = auth.currentUser;
+  const mine = user ? orders.filter(o => o.user === user.email).reverse() : [];
   c.innerHTML = mine.length ? mine.map(o => `
     <div style="background:var(--card);padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;font-weight:700"><span>#${String(o.id).slice(-4)}</span><span style="color:${o.status==='delivered'?'green':'orange'}">${o.status}</span></div>
+      <div style="display:flex;justify-content:space-between;font-weight:700"><span>#${String(o.id).slice(-4)}</span><span style="color:${o.status==='delivered'?'var(--success)':'orange'}">${o.status}</span></div>
       <div style="font-size:0.9rem;margin:6px 0">${o.items}</div>
       <div style="font-weight:600">${o.total} ₽</div>
       ${o.qrImage ? `<img src="${o.qrImage}" style="max-width:100%;margin-top:8px;border-radius:8px">` : ''}
@@ -181,7 +179,8 @@ function renderAdmin() {
   c.innerHTML = orders.reverse().map(o => `
     <div class="order-row">
       <div style="flex:1"><b>#${String(o.id).slice(-4)} | ${o.user?.split('@')[0]}</b><br><small>${o.items}</small>
-        <div style="margin-top:6px">${['new','assembling','shipping','delivered'].map(s=>`<button style="padding:4px 8px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};border-radius:4px;cursor:pointer;font-size:0.75rem" onclick="updateStatus(${o.id},'${s}')">${s}</button>`).join('')}</div>
+        <div style="margin-top:6px">${['new','assembling','shipping','delivered'].map(s=>`<button style="padding:4px 8px;border:1px solid var(--border);background:${o.status===s?'var(--primary)':'transparent'};color:${o.status===s?'#fff':'var(--text)'};border-radius:4px;cursor:pointer;font-size:0.75rem" onclick="window.updateStatus(${o.id},'${s}')">${s}</button>`).join('')}</div>
+        ${o.status==='delivered'?`<div style="margin-top:8px"><input type="file" id="qr-${o.id}" accept="image/*" style="display:none" onchange="window.uploadQR(${o.id},this)"><label for="qr-${o.id}" style="padding:4px 8px;background:var(--success);color:#fff;border-radius:4px;cursor:pointer;font-size:0.75rem">📷 Загрузить QR</label></div>`:''}
       </div>
       <div style="text-align:right"><b>${o.total} ₽</b></div>
     </div>`).join('');
@@ -191,18 +190,28 @@ window.updateStatus = (id, status) => {
   const o = orders.find(x => x.id === id);
   if(o) { o.status = status; localStorage.setItem('allOrders', JSON.stringify(orders)); renderAdmin(); }
 };
+window.uploadQR = (id, input) => {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let orders = JSON.parse(localStorage.getItem('allOrders'))||[];
+    const o = orders.find(x => x.id === id);
+    if(o) { o.qrImage = e.target.result; localStorage.setItem('allOrders', JSON.stringify(orders)); alert('✅ QR сохранён'); renderAdmin(); }
+  };
+  reader.readAsDataURL(file);
+};
 
 // === 10. CHAT & BOT ===
 const botCommands = {
-  '/test': () => '✅ Бот работает',
+  '/test': () => '✅ Бот работает. Вы админ: ' + (ADMIN_EMAILS.includes(auth.currentUser?.email) ? 'Да' : 'Нет'),
   '/stats': () => {
-    if(!firebase.auth().currentUser || !ADMIN_EMAILS.includes(firebase.auth().currentUser.email)) return '🔒 Только админам';
+    if(!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 Только админам';
     const orders = JSON.parse(localStorage.getItem('allOrders')||'[]');
     const rev = orders.reduce((s,o)=>s+parseFloat(o.total)||0,0);
-    return `📊 Заказов: ${orders.length}\n💰 Выручка: ${rev.toLocaleString('ru')} ₽`;
+    return `📊 Заказов: ${orders.length}\n💰 Выручка: ${rev.toLocaleString('ru')} ₽\n🛍️ Товаров: ${products.length}`;
   },
   '/add': async (args) => {
-    if(!firebase.auth().currentUser || !ADMIN_EMAILS.includes(firebase.auth().currentUser.email)) return '🔒 Только админам';
+    if(!auth.currentUser || !ADMIN_EMAILS.includes(auth.currentUser.email)) return '🔒 Только админам';
     const p = args.split('|').map(x=>x.trim());
     if(p.length<5) return '❌ Формат: /add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2';
     const [name, price, cat, sizes, desc, imgs] = p;
@@ -210,10 +219,10 @@ const botCommands = {
     if(images.length===0) images.push('👟');
     try {
       await db.collection('products').add({name, price: Number(price), category: cat, sizes: sizes.split(',').map(s=>s.trim()), desc, images, rating:5, reviews:0, createdAt:new Date().toISOString()});
-      return `✅ ${name} добавлен`;
+      return `✅ ${name} добавлен в каталог`;
     } catch(e) { return `❌ ${e.message}`; }
   },
-  '/help': () => '🤖 /test, /stats, /add Name|Price|Cat|Sizes|Desc|Img1,Img2'
+  '/help': () => '🤖 Команды:\n/test — проверка\n/stats — статистика\n/add Name|Price|Cat|Sizes|Desc|Img1,Img2 — добавить товар'
 };
 
 window.openSupportChat = () => {
@@ -243,34 +252,54 @@ window.sendChatMessage = () => {
   }
 };
 
-// === 11. AUTH ===
+// === 11. AUTH (FIXED) ===
 const authForm = document.getElementById('auth-form');
 if(authForm) {
   let isLogin = true;
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
     t.classList.add('active'); isLogin = t.dataset.tab==='login';
-    document.getElementById('auth-submit').textContent = isLogin ? 'Войти' : 'Рег';
+    document.getElementById('auth-submit').textContent = isLogin ? 'Войти' : 'Регистрация';
     document.getElementById('auth-error').style.display='none';
   });
 
   authForm.onsubmit = async e => {
     e.preventDefault();
-    const em = document.getElementById('email-input').value.trim(), pw = document.getElementById('pass-input').value;
-    const btn = document.getElementById('auth-submit'), err = document.getElementById('auth-error');
-    err.style.display='none'; btn.disabled=true; btn.textContent='...';
-    try { isLogin ? await auth.signInWithEmailAndPassword(em,pw) : await auth.createUserWithEmailAndPassword(em,pw); }
-    catch(e) { err.textContent = e.message; err.style.display='block'; }
-    finally { btn.disabled=false; btn.textContent=isLogin?'Войти':'Рег'; }
+    const em = document.getElementById('email-input').value.trim();
+    const pw = document.getElementById('pass-input').value;
+    const btn = document.getElementById('auth-submit');
+    const err = document.getElementById('auth-error');
+    
+    console.log('[AUTH] Попытка входа:', em);
+    err.style.display='none'; btn.disabled=true; btn.textContent='Вход...';
+    
+    try {
+      if(isLogin) await auth.signInWithEmailAndPassword(em, pw);
+      else await auth.createUserWithEmailAndPassword(em, pw);
+      console.log('[AUTH] Успех');
+    } catch(e) {
+      console.error('[AUTH] Ошибка:', e.code, e.message);
+      const msgs = {
+        'auth/user-not-found': 'Пользователь не найден. Проверьте email или зарегистрируйтесь.',
+        'auth/wrong-password': 'Неверный пароль.',
+        'auth/invalid-email': 'Неверный формат email.',
+        'auth/weak-password': 'Пароль минимум 6 символов.'
+      };
+      err.textContent = msgs[e.code] || e.message;
+      err.style.display='block';
+    } finally {
+      btn.disabled=false; btn.textContent=isLogin?'Войти':'Регистрация';
+    }
   };
 
   auth.onAuthStateChanged(user => {
+    console.log('[AUTH] Статус:', user ? user.email : 'Гость');
     if(user) {
       document.getElementById('auth-flow').style.display='none';
       document.getElementById('profile-actions').style.display='block';
       document.getElementById('profile-email').textContent = user.email;
       if(ADMIN_EMAILS.includes(user.email) && !document.getElementById('admin-link')) {
-        document.querySelector('.menu-grid').innerHTML += `<div class="menu-item" id="admin-link" onclick="window.navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админка</span></div>`;
+        document.querySelector('.menu-grid').innerHTML += `<div class="menu-item" id="admin-link" onclick="window.navigate('admin')"><i class="fa-solid fa-lock"></i><span>Админка</span><i class="fa-solid fa-chevron-right"></i></div>`;
       }
     } else {
       document.getElementById('auth-flow').style.display='block';
@@ -280,7 +309,11 @@ if(authForm) {
       document.getElementById('admin-link')?.remove();
     }
   });
-  document.getElementById('logout-btn').onclick = () => auth.signOut();
+  
+  document.getElementById('logout-btn').onclick = () => {
+    auth.signOut();
+    console.log('[AUTH] Выход выполнен');
+  };
 }
 
 // === 12. INIT ===
