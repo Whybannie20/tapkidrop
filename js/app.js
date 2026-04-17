@@ -31,7 +31,26 @@ const categories = [
   {id:'swag',name:'Сваг'},{id:'classics',name:'Классика'},{id:'sale',name:'Распродажа'}
 ];
 
-// === 3. DB & RENDER ===
+// === 3. SEED TEST PRODUCT (IF EMPTY) ===
+function seedTestProduct() {
+  window.db.collection('products').get().then(snap => {
+    if(snap.empty) {
+      console.log("[DB] База пуста, добавляем тестовый товар...");
+      window.db.collection('products').add({
+        name: "Nike Air Max 97 Silver",
+        price: 14990,
+        category: "designer",
+        sizes: ["39","40","41","42","43","44"],
+        desc: "Легендарная модель с системой амортизации Air. Идеальное состояние, полная комплектация.",
+        images: ["https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"],
+        rating: 4.9, reviews: 128,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  });
+}
+
+// === 4. DB & RENDER ===
 function loadProducts() {
   try {
     window.db.collection('products').get().then(snap => {
@@ -62,7 +81,7 @@ const renderGrid = (id, list) => {
   }).join('');
 };
 
-// === 4. NAVIGATION ===
+// === 5. NAVIGATION ===
 window.navigate = target => {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const el = document.getElementById(target); if(el) el.classList.add('active');
@@ -74,7 +93,7 @@ window.navigate = target => {
 };
 document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => window.navigate(b.dataset.target));
 
-// === 5. PRODUCT PAGE ===
+// === 6. PRODUCT PAGE ===
 window.openProduct = id => {
   const p = products.find(x => x.id === id); if(!p) return;
   currentProductId = id; selectedSize = null;
@@ -119,7 +138,7 @@ window.addToCart = id => {
   localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart();
 };
 
-// === 6. CART ===
+// === 7. CART ===
 const updateCart = () => {
   const badge = document.getElementById('cart-badge'); if(badge) badge.textContent = window.cart.reduce((s,i)=>s+(i.qty||1),0);
   const empty = document.getElementById('cart-empty'), layout = document.getElementById('cart-layout');
@@ -142,7 +161,7 @@ const updateCart = () => {
 window.changeQty = (idx,d) => { window.cart[idx].qty=(window.cart[idx].qty||1)+d; if(window.cart[idx].qty<1)window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 window.removeItem = idx => { window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 
-// === 7. ADDRESS / PVZ ===
+// === 8. ADDRESS / PVZ ===
 window.openPVZModal = () => {
   document.getElementById('pvz-city').value = window.selectedPVZ.city || '';
   document.getElementById('pvz-address').value = window.selectedPVZ.address || '';
@@ -159,7 +178,7 @@ window.savePVZ = () => {
   window.closePVZModal();
 };
 
-// === 8. CHECKOUT (FIRESTORE ORDERS) ===
+// === 9. CHECKOUT (FIRESTORE ORDERS) ===
 window.checkout = () => {
   const user = window.auth.currentUser;
   if(!user) { window.navigate('profile'); return alert('Для оформления заказа необходимо войти в аккаунт'); }
@@ -192,7 +211,7 @@ window.checkout = () => {
   }).catch(err => alert('❌ Ошибка оформления: ' + err.message));
 };
 
-// === 9. ORDERS (REAL-TIME FIRESTORE) ===
+// === 10. ORDERS (REAL-TIME FIRESTORE) ===
 let ordersListener = null;
 window.renderOrders = () => {
   const c = document.getElementById('my-orders-list'); if(!c) return;
@@ -244,19 +263,41 @@ window.renderOrders = () => {
     });
 };
 
-// === 10. ADMIN ===
+// === 11. ADMIN DASHBOARD (UI BASED) ===
 function renderAdmin() {
-  const c = document.getElementById('orders-list-admin'); if(!c) return;
+  const usersListEl = document.getElementById('admin-users-list');
+  const logsEl = document.getElementById('admin-logs');
   
-  // Отписываемся от старого слушателя если есть
+  // 1. Fetch Stats
+  window.db.collection('orders').get().then(snap => {
+    let revenue = 0;
+    const users = new Set();
+    let count = 0;
+    snap.forEach(doc => {
+      const o = doc.data();
+      revenue += parseFloat(o.total.replace(/\s|₽/g, '')) || 0;
+      users.add(o.userId);
+      count++;
+    });
+    document.getElementById('stat-orders').textContent = count;
+    document.getElementById('stat-revenue').textContent = revenue.toLocaleString('ru') + ' ₽';
+    document.getElementById('stat-users').textContent = users.size;
+    
+    // Render Users
+    if(usersListEl) usersListEl.innerHTML = Array.from(users).map(u => `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem">${u}</div>`).join('');
+  });
+
+  // 2. Fetch Products Count
+  window.db.collection('products').get().then(snap => {
+    document.getElementById('stat-products').textContent = snap.size;
+  });
+
+  // 3. Render Orders List (Admin View)
+  const c = document.getElementById('orders-list-admin'); if(!c) return;
   if(window.adminOrdersListener) window.adminOrdersListener();
   
   window.adminOrdersListener = window.db.collection('orders').orderBy('createdAt','desc').onSnapshot(snap => {
-    const st = document.getElementById('admin-stats');
-    if(st) st.innerHTML = `<div class="stat-box"><span class="stat-num">${snap.size}</span><small>Всего заказов</small></div>`;
-    
     if(snap.empty) { c.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">Заказов пока нет</p>'; return; }
-    
     c.innerHTML = snap.docs.map(doc => {
       const o = doc.data(); o.id = doc.id;
       return `<div class="order-row">
@@ -277,7 +318,11 @@ function renderAdmin() {
 
 window.updateStatus = (id, status) => {
   window.db.collection('orders').doc(id).update({ status })
-    .then(() => console.log(`Статус ${id} обновлён на ${status}`))
+    .then(() => {
+      console.log(`Статус ${id} обновлён`);
+      const logs = document.getElementById('admin-logs');
+      if(logs) logs.innerHTML += `<div style="color:var(--success)">✅ Заказ #${id.slice(-4)} переведен в "${status}"</div>`;
+    })
     .catch(err => alert('Ошибка обновления: ' + err.message));
 };
 
@@ -286,36 +331,49 @@ window.uploadQR = (id, input) => {
   const reader = new FileReader();
   reader.onload = e => {
     window.db.collection('orders').doc(id).update({ qrImage: e.target.result })
-      .then(() => alert('✅ Фото/QR успешно сохранено. Клиент увидит его мгновенно.'))
+      .then(() => {
+        alert('✅ Фото/QR успешно сохранено. Клиент увидит его мгновенно.');
+        const logs = document.getElementById('admin-logs');
+        if(logs) logs.innerHTML += `<div style="color:var(--primary)">📷 QR загружен для #${id.slice(-4)}</div>`;
+      })
       .catch(err => alert('Ошибка загрузки: ' + err.message));
   };
   reader.readAsDataURL(file);
 };
 
-// === 11. HYBRID CHAT (RUSSIAN FAQ + ADMIN) ===
-const botCommands = {
-  '/test': () => '✅ Связь работает. Вы администратор: ' + (ADMIN_EMAILS.includes(window.auth.currentUser?.email) ? 'Да' : 'Нет'),
-  '/stats': () => {
-    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Доступно только администраторам';
-    return '📊 Статистика загружается из облака...';
-  },
-  '/add': async (args) => {
-    if(!window.auth.currentUser || !ADMIN_EMAILS.includes(window.auth.currentUser.email)) return '🔒 Только для администраторов';
-    const p = args.split('|').map(x=>x.trim());
-    if(p.length<5) return '❌ Неверный формат!\n\nИспользуйте:\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2\n\nПример:\n/add Yeezy 350 | 15000 | swag | 40,41,42,43 | Уличные кроссовки | https://img1.jpg, https://img2.jpg';
-    
-    const [name, price, cat, sizes, desc, imgs] = p;
-    const images = imgs ? imgs.split(',').map(u=>u.trim()).filter(u=>u.startsWith('http')) : ['👟'];
-    if(images.length===0) images.push('👟');
-    
-    try {
-      await window.db.collection('products').add({name, price: Number(price), category: cat, sizes: sizes.split(',').map(s=>s.trim()), desc, images, rating:5, reviews:0, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
-      return `✅ <b>${name}</b> успешно добавлен в каталог!\n💰 ${Number(price).toLocaleString('ru')} ₽ | 📏 ${sizes}`;
-    } catch(e) { return `❌ Ошибка базы данных: ${e.message}`; }
-  },
-  '/help': () => '🤖 <b>Команды администратора:</b>\n\n/add Название | Цена | Категория | Размеры | Описание | Фото1, Фото2\n/stats — статистика заказов\n\n💡 Для клиентов: просто задайте вопрос на русском языке.'
+// === 12. ADD PRODUCT FROM UI ===
+window.addProductFromUI = () => {
+  const name = document.getElementById('new-prod-name').value;
+  const price = document.getElementById('new-prod-price').value;
+  const cat = document.getElementById('new-prod-cat').value;
+  const sizes = document.getElementById('new-prod-sizes').value;
+  const img = document.getElementById('new-prod-img').value;
+  const desc = document.getElementById('new-prod-desc').value;
+
+  if(!name || !price) return alert('Заполните название и цену');
+
+  const newProd = {
+    name, price: Number(price), category: cat, 
+    sizes: sizes.split(',').map(s=>s.trim()), 
+    images: img ? [img] : ['👟'],
+    desc, rating: 5.0, reviews: 0,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  window.db.collection('products').add(newProd).then(() => {
+    alert('✅ Товар успешно опубликован!');
+    document.getElementById('new-prod-name').value = '';
+    document.getElementById('new-prod-price').value = '';
+    document.getElementById('new-prod-sizes').value = '';
+    document.getElementById('new-prod-img').value = '';
+    document.getElementById('new-prod-desc').value = '';
+    loadProducts(); // Refresh grid
+    const logs = document.getElementById('admin-logs');
+    if(logs) logs.innerHTML += `<div style="color:var(--primary)">📦 Товар "${name}" добавлен</div>`;
+  }).catch(err => alert('Ошибка: ' + err.message));
 };
 
+// === 13. SUPPORT CHAT (CLIENT FAQ) ===
 const faqDB = {
   'доставк|сроки|когда придет|где мой': '🚚 Доставка по России занимает 1-3 рабочих дня. Бесплатно при заказе от 5000 ₽. Трек-номер придёт в SMS сразу после отправки.',
   'возврат|вернуть|деньги назад|отказ|не понравился': '↩️ Возврат возможен в течение 14 дней, если товар не носился и сохранены бирки. Курьер заберёт заказ бесплатно.',
@@ -331,50 +389,39 @@ const faqDB = {
 
 window.openSupportChat = () => {
   document.getElementById('support-modal').style.display = 'flex';
-  const box = document.getElementById('chat-messages');
-  box.innerHTML = '<div class="msg bot">👋 Здравствуйте! Я виртуальный помощник ТапкиДроп. Чем могу помочь?<br><br><small>💡 Администраторы: введите /help для списка команд</small></div>';
+  // Show quick questions initially
+  document.getElementById('quick-questions').style.display = 'flex';
 };
 window.closeSupportChat = () => document.getElementById('support-modal').style.display = 'none';
 
+window.sendChatMessageDirect = (txt) => {
+  const inp = document.getElementById('chat-input'); 
+  inp.value = txt;
+  window.sendChatMessage();
+};
+
 window.sendChatMessage = () => {
   const inp = document.getElementById('chat-input'); const txt = inp.value.trim(); if(!txt) return;
+  
+  // Hide quick questions after first message
+  document.getElementById('quick-questions').style.display = 'none';
+
   const box = document.getElementById('chat-messages');
   box.innerHTML += `<div class="msg user">${txt}</div>`; inp.value=''; box.scrollTop=box.scrollHeight;
-  
-  // Admin Commands
-  if(txt.startsWith('/') && window.auth.currentUser && ADMIN_EMAILS.includes(window.auth.currentUser.email)) {
-    const m = txt.match(/^\/(\w+)\s*(.*)?$/);
-    if(m) {
-      const cmd = '/' + m[1].toLowerCase(); const args = m[2]||'';
-      setTimeout(async () => {
-        const handler = botCommands[cmd];
-        box.innerHTML += `<div class="msg bot">${handler ? await handler(args) : '❌ Неизвестная команда. Введите /help'}</div>`;
-        box.scrollTop=box.scrollHeight;
-      }, 300);
-      return;
-    }
-  }
 
-  // Client FAQ
+  // Client FAQ Response
   setTimeout(() => {
     const lower = txt.toLowerCase();
     let reply = null;
     for(const [keys, ans] of Object.entries(faqDB)) {
       if(keys.split('|').some(k => lower.includes(k))) { reply = ans; break; }
     }
-    box.innerHTML += `<div class="msg bot">${reply || '🤔 Я пока не понял ваш вопрос. Попробуйте переформулировать или нажмите кнопку ниже.'}</div>`;
-    if(!reply) {
-       box.innerHTML += `<div class="msg bot" style="background:#e9ecef;cursor:pointer;margin-top:6px" onclick="window.sendChatMessageDirect('Хочу поговорить с оператором')">👨‍ Связаться с оператором</div>`;
-    }
+    box.innerHTML += `<div class="msg bot">${reply || '🤔 Я пока не понял ваш вопрос. Попробуйте переформулировать или нажмите "Связаться с оператором".'}</div>`;
     box.scrollTop=box.scrollHeight;
   }, 500);
 };
-window.sendChatMessageDirect = (txt) => {
-  const inp = document.getElementById('chat-input'); inp.value = txt;
-  window.sendChatMessage();
-};
 
-// === 12. AUTH ===
+// === 14. AUTH ===
 const authForm = document.getElementById('auth-form');
 if(authForm) {
   let isLogin = true;
@@ -435,6 +482,7 @@ if(authForm) {
   };
 }
 
-// === 13. INIT ===
+// === 15. INIT ===
+seedTestProduct(); // Ensure we have at least one item
 loadProducts();
 updateCart();

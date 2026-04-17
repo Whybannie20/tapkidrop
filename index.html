@@ -130,12 +130,54 @@
       </div>
     </section>
 
+    <!-- ADMIN DASHBOARD -->
     <section id="admin" class="page">
       <div class="container">
         <button class="back-btn" onclick="window.navigate('profile')"><i class="fa-solid fa-arrow-left"></i> Назад в профиль</button>
         <h1>Панель управления</h1>
-        <div id="admin-stats" class="admin-stats"></div>
-        <div class="admin-grid"><div class="admin-card"><h3>Все заказы</h3><div id="orders-list-admin"></div></div></div>
+        
+        <!-- STATS ROW -->
+        <div class="admin-stats" id="admin-stats">
+          <div class="stat-box"><span class="stat-num" id="stat-orders">0</span><small>Заказов</small></div>
+          <div class="stat-box"><span class="stat-num" id="stat-revenue">0 ₽</span><small>Выручка</small></div>
+          <div class="stat-box"><span class="stat-num" id="stat-users">0</span><small>Клиентов</small></div>
+          <div class="stat-box"><span class="stat-num" id="stat-products">0</span><small>Товаров</small></div>
+        </div>
+
+        <!-- ADD PRODUCT FORM -->
+        <div class="admin-card" style="margin-bottom:20px">
+          <h3>📦 Добавить новый товар</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px">
+            <input type="text" id="new-prod-name" placeholder="Название (напр. Nike Air Max)" class="input">
+            <input type="number" id="new-prod-price" placeholder="Цена (напр. 12990)" class="input">
+            <select id="new-prod-cat" class="input">
+              <option value="designer">✨ Дизайнерские</option>
+              <option value="kids">🧒 Детские</option>
+              <option value="swag">🔥 Сваг</option>
+              <option value="classics">👟 Классика</option>
+              <option value="sale">🏷️ Распродажа</option>
+            </select>
+            <input type="text" id="new-prod-sizes" placeholder="Размеры (39,40,41)" class="input">
+          </div>
+          <input type="text" id="new-prod-img" placeholder="Ссылка на главное фото (или оставьте пустым для 👟)" class="input" style="margin-top:10px">
+          <textarea id="new-prod-desc" placeholder="Описание товара..." class="input" style="height:60px;margin-top:10px"></textarea>
+          <button class="btn btn--primary full" style="margin-top:10px" onclick="window.addProductFromUI()">💾 Опубликовать товар</button>
+        </div>
+
+        <!-- DATABASE & MONITORING -->
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>👥 База клиентов</h3>
+            <div id="admin-users-list" style="max-height:200px;overflow-y:auto;margin-top:10px"></div>
+          </div>
+          <div class="admin-card">
+            <h3>📋 Системный лог</h3>
+            <div id="admin-logs" style="font-size:0.8rem;color:var(--muted);margin-top:10px">
+              <div>✅ Система работает стабильно</div>
+              <div>🟢 Firebase подключен</div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -147,21 +189,31 @@
     <button class="nav-item" data-target="profile"><i class="fa-regular fa-user"></i><span>Профиль</span></button>
   </nav>
 
-  <!-- ПОЛНОЭКРАННАЯ ПОДДЕРЖКА -->
+  <!-- SUPPORT CHAT WITH QUICK QUESTIONS -->
   <div id="support-modal" class="support-fullscreen" style="display:none">
     <div class="support-header">
       <button onclick="window.closeSupportChat()" style="background:none;border:none;color:#fff;font-size:1.2rem;padding:10px">✕</button>
       <h3 style="margin:0;color:#fff;font-size:1.1rem">Служба поддержки</h3>
       <div style="width:40px"></div>
     </div>
-    <div class="support-body" id="chat-messages"></div>
+    <div class="support-body" id="chat-messages">
+      <!-- Quick Questions List -->
+      <div id="quick-questions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:15px">
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:4px">Частые вопросы (нажмите для ответа):</p>
+        <button class="quick-q-btn" onclick="window.sendChatMessageDirect('Как оформить возврат?')">↩️ Как оформить возврат?</button>
+        <button class="quick-q-btn" onclick="window.sendChatMessageDirect('Где мой заказ?')">📦 Где мой заказ?</button>
+        <button class="quick-q-btn" onclick="window.sendChatMessageDirect('Какие способы оплаты?')">💳 Способы оплаты</button>
+        <button class="quick-q-btn" onclick="window.sendChatMessageDirect('Таблица размеров')">📏 Таблица размеров</button>
+        <button class="quick-q-btn" onclick="window.sendChatMessageDirect('Хочу к оператору')">👨‍ Связаться с оператором</button>
+      </div>
+    </div>
     <div class="support-footer">
-      <input type="text" id="chat-input" placeholder="Напишите вопрос или команду...">
+      <input type="text" id="chat-input" placeholder="Или напишите свой вопрос...">
       <button onclick="window.sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО АДРЕСА -->
+  <!-- PVZ MODAL -->
   <div id="pvz-modal" class="pvz-modal" style="display:none">
     <div class="pvz-content">
       <div class="pvz-header"><h3>Адрес доставки</h3><button onclick="window.closePVZModal()">✕</button></div>
