@@ -11,7 +11,7 @@ try {
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   window.auth = firebase.auth();
   window.db = firebase.firestore();
-  window.storage = firebase.storage(); // Инициализация хранилища
+  window.storage = firebase.storage();
   window.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
   console.log("[FB] Инициализация завершена");
 } catch (e) { console.error("[FB] Ошибка инициализации:", e); }
@@ -35,6 +35,7 @@ const categories = [
 function seedTestProduct() {
   window.db.collection('products').get().then(snap => {
     if(snap.empty) {
+      console.log("[DB] Добавляем тестовый товар...");
       window.db.collection('products').add({
         name: "Nike Air Max 97 Silver", price: 14990, category: "designer",
         sizes: ["39","40","41","42","43","44"],
@@ -60,7 +61,7 @@ function loadProducts() {
     console.log(`[DB] Загружено ${products.length} товаров`);
     renderGrid('home-grid', products.slice(0,4));
     renderGrid('catalog-grid', products);
-    renderAdminProductsList(); // Обновляем список в админке тоже
+    renderAdminProductsList(); 
   }, (error) => {
     console.error("[DB] Ошибка слушателя:", error);
   });
@@ -129,7 +130,7 @@ window.addToCart = id => {
   localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart();
 };
 
-// === 7. CART & CHECKOUT (FIXED) ===
+// === 7. CART & CHECKOUT (FIXED INFINITE LOADING) ===
 const updateCart = () => {
   const badge = document.getElementById('cart-badge'); if(badge) badge.textContent = window.cart.reduce((s,i)=>s+(i.qty||1),0);
   const empty = document.getElementById('cart-empty'), layout = document.getElementById('cart-layout');
@@ -146,21 +147,17 @@ window.changeQty = (idx,d) => { window.cart[idx].qty=(window.cart[idx].qty||1)+d
 window.removeItem = idx => { window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 
 window.checkout = async () => {
-  console.log("[CHECKOUT] Начало оформления...");
+  console.log("[CHECKOUT] Старт...");
   const btn = document.getElementById('checkout-btn');
   const user = window.auth.currentUser;
   
-  if(!user) { 
-    window.navigate('profile'); 
-    return alert('⚠️ Для оформления заказа необходимо войти в аккаунт'); 
-  }
+  if(!user) { window.navigate('profile'); return alert('⚠️ Войдите в аккаунт'); }
   if(!window.cart.length) return alert('⚠️ Корзина пуста');
   
-  // Проверка адреса
   const addr = `${window.selectedPVZ.city||''}, ${window.selectedPVZ.address||''} ${window.selectedPVZ.details||''}`.replace(/,\s*,/g,',').trim();
   if(!addr || addr === ', ') {
     window.openPVZModal();
-    return alert('⚠️ Пожалуйста, укажите адрес доставки в Профиле -> Адрес доставки');
+    return alert('⚠️ Укажите адрес доставки');
   }
 
   const total = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
@@ -170,6 +167,7 @@ window.checkout = async () => {
   btn.textContent = '⏳ Оформление...';
   
   try {
+    console.log("[CHECKOUT] Отправка в базу...");
     await window.db.collection('orders').add({
       userId: user.email, 
       userName: user.displayName||user.email.split('@')[0],
@@ -182,7 +180,6 @@ window.checkout = async () => {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     
-    // Очищаем корзину
     window.cart.forEach(it=>{ 
       if(!window.purchasedProducts.some(p=>p.id===it.id&&p.user===user.email)) 
         window.purchasedProducts.push({id:it.id,user:user.email,date:new Date().toISOString()}); 
@@ -195,13 +192,15 @@ window.checkout = async () => {
     localStorage.setItem('cart','[]'); 
     updateCart();
     
-    alert('✅ Заказ успешно оформлен!\nАдрес: ' + addr);
+    alert('✅ Заказ оформлен!');
     window.navigate('my-orders');
     
   } catch(e) {
     console.error("Checkout Error:", e);
-    alert('❌ Ошибка при оформлении: ' + e.message);
+    alert('❌ Ошибка: ' + e.message);
   } finally {
+    // ВСЕГДА разблокируем кнопку
+    console.log("[CHECKOUT] Завершено (finally)");
     btn.disabled = false;
     btn.textContent = 'Оформить заказ';
   }
@@ -244,7 +243,7 @@ window.renderOrders = () => {
   });
 };
 
-// === 10. ADMIN DASHBOARD (WITH IMAGE UPLOAD) ===
+// === 10. ADMIN DASHBOARD (FIXED HANGS) ===
 function showToast(msg){const t=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 function renderAdmin() {
@@ -293,7 +292,7 @@ const compressImage = (file, maxWidth = 800) => {
 };
 
 window.saveProduct = async () => {
-  console.log("[ADMIN] Сохранение товара...");
+  console.log("[ADMIN] Старт сохранения товара...");
   const btn = document.getElementById('prod-submit-btn');
   const editId = document.getElementById('edit-prod-id').value;
   const name = document.getElementById('new-prod-name').value.trim();
@@ -306,9 +305,10 @@ window.saveProduct = async () => {
   let imgUrl = document.getElementById('new-prod-img').value.trim();
   const fileInput = document.getElementById('new-prod-file');
   
-  // Если выбран файл, загружаем в Storage
-  if(fileInput.files[0]) {
-    try {
+  try {
+    // 1. Загрузка фото (если есть файл)
+    if(fileInput.files[0]) {
+      console.log("[ADMIN] Загрузка фото...");
       btn.textContent = '⏳ Загрузка фото...';
       const file = fileInput.files[0];
       const compressed = await compressImage(file);
@@ -317,25 +317,22 @@ window.saveProduct = async () => {
       await ref.put(compressed);
       imgUrl = await ref.getDownloadURL();
       console.log("[STORAGE] Фото загружено:", imgUrl);
-    } catch(e) {
-      console.error(e);
-      alert('❌ Ошибка загрузки фото: ' + e.message);
-      btn.disabled = false; btn.textContent = '💾 Опубликовать товар';
-      return;
     }
-  }
-  
-  if(!imgUrl) imgUrl = '👟'; // Default emoji if no link and no file
+    
+    if(!imgUrl) imgUrl = '👟'; 
 
-  const prodData = {
-    name, price: Number(price), category: document.getElementById('new-prod-cat').value,
-    sizes: document.getElementById('new-prod-sizes').value.split(',').map(s=>s.trim()).filter(Boolean),
-    images: [imgUrl],
-    desc: document.getElementById('new-prod-desc').value,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
+    const prodData = {
+      name, price: Number(price), category: document.getElementById('new-prod-cat').value,
+      sizes: document.getElementById('new-prod-sizes').value.split(',').map(s=>s.trim()).filter(Boolean),
+      images: [imgUrl],
+      desc: document.getElementById('new-prod-desc').value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
 
-  try {
+    // 2. Сохранение в БД
+    console.log("[ADMIN] Сохранение в базу...");
+    btn.textContent = editId ? '⏳ Обновление...' : '⏳ Публикация...';
+    
     if(editId) {
       await window.db.collection('products').doc(editId).set(prodData, {merge: true});
       showToast('✅ Товар обновлён');
@@ -343,13 +340,16 @@ window.saveProduct = async () => {
       prodData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       prodData.rating = 5.0; prodData.reviews = 0;
       await window.db.collection('products').add(prodData);
-      showToast('✅ Товар опубликован в каталоге');
+      showToast('✅ Товар опубликован');
     }
     window.cancelEdit();
+    
   } catch(e) {
-    console.error(e);
-    alert('❌ Ошибка сохранения: ' + e.message);
+    console.error("[ADMIN] Ошибка сохранения:", e);
+    alert('❌ Ошибка: ' + e.message + '\n\nПроверьте консоль (F12) для деталей.');
   } finally {
+    // ВСЕГДА разблокируем
+    console.log("[ADMIN] Завершено (finally)");
     btn.disabled = false;
     btn.textContent = editId ? '💾 Сохранить изменения' : '💾 Опубликовать товар';
   }
@@ -367,7 +367,6 @@ window.editProduct = (id) => {
   document.getElementById('new-prod-img').value = (p.images?.[0]?.startsWith('http')) ? p.images[0] : '';
   document.getElementById('new-prod-desc').value = p.desc||'';
   
-  // Preview image if exists
   const preview = document.getElementById('img-preview');
   if(p.images?.[0]?.startsWith('http')) {
     preview.style.display = 'block';
@@ -395,10 +394,23 @@ window.cancelEdit = () => {
 };
 
 window.deleteProduct = (id) => {
-  if(!confirm('🗑 Удалить этот товар из каталога?')) return;
-  window.db.collection('products').doc(id).delete().then(()=>{
-    showToast('🗑 Товар удалён'); 
-  });
+  if(!confirm('🗑 Удалить этот товар?')) return;
+  window.db.collection('products').doc(id).delete().then(()=> showToast('🗑 Товар удалён')).catch(e => alert(e.message));
+};
+
+// Update Status (FIXED HANG)
+window.updateStatus = (id, status) => {
+  console.log(`[ADMIN] Изменение статуса ${id} на ${status}...`);
+  // Не блокируем весь интерфейс, просто меняем статус в фоне
+  window.db.collection('orders').doc(id).update({ status })
+    .then(() => {
+      console.log("[ADMIN] Статус обновлен");
+      showToast(`Статус изменен на "${status}"`);
+    })
+    .catch(e => {
+      console.error(e);
+      alert('❌ Ошибка обновления статуса: ' + e.message);
+    });
 };
 
 // Preview on file select
