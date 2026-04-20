@@ -14,6 +14,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script> <!-- STORAGE -->
 </head>
 <body>
 
@@ -88,7 +89,7 @@
           <div class="cart-items" id="cart-items"></div>
           <div class="cart-summary">
             <div class="summary-row total"><span>Итого к оплате</span><span id="cart-total">0 ₽</span></div>
-            <button class="btn btn--primary full" onclick="window.checkout()">Оформить заказ</button>
+            <button class="btn btn--primary full" id="checkout-btn" onclick="window.checkout()">Оформить заказ</button>
             <p style="font-size:0.8rem;color:var(--muted);text-align:center;margin-top:8px">🔒 Безопасная оплата. Гарантия возврата 14 дней.</p>
           </div>
         </div>
@@ -159,7 +160,18 @@
             </select>
             <input type="text" id="new-prod-sizes" placeholder="Размеры (39,40,41)" class="input">
           </div>
-          <input type="text" id="new-prod-img" placeholder="Ссылка на главное фото (или оставьте пустым для 👟)" class="input" style="margin-top:10px">
+          
+          <!-- PHOTO UPLOAD SECTION -->
+          <div style="margin-top:10px;border:1px dashed var(--border);padding:10px;border-radius:10px;background:var(--bg)">
+            <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">📸 Фото товара</label>
+            <div style="display:flex;gap:10px;align-items:center">
+              <input type="file" id="new-prod-file" accept="image/*" style="flex:1;font-size:0.9rem">
+              <div id="img-preview" style="width:50px;height:50px;background:#fff;border-radius:6px;overflow:hidden;display:none;border:1px solid var(--border)"></div>
+            </div>
+            <p style="font-size:0.75rem;color:var(--muted);margin-top:4px">Или вставьте прямую ссылку ниже:</p>
+            <input type="text" id="new-prod-img" placeholder="https://..." class="input" style="margin-top:4px">
+          </div>
+
           <textarea id="new-prod-desc" placeholder="Описание товара..." class="input" style="height:60px;margin-top:10px"></textarea>
           <button id="prod-submit-btn" class="btn btn--primary full" style="margin-top:10px" type="button" onclick="window.saveProduct()">💾 Опубликовать товар</button>
           <button id="cancel-edit-btn" class="btn btn--outline full" style="margin-top:8px;display:none" type="button" onclick="window.cancelEdit()">❌ Отмена редактирования</button>

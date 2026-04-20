@@ -11,6 +11,7 @@ try {
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   window.auth = firebase.auth();
   window.db = firebase.firestore();
+  window.storage = firebase.storage(); // Инициализация хранилища
   window.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
   console.log("[FB] Инициализация завершена");
 } catch (e) { console.error("[FB] Ошибка инициализации:", e); }
@@ -20,7 +21,7 @@ const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
 window.cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
 window.purchasedProducts = JSON.parse(localStorage.getItem('purchasedProducts')) || [];
-let products = []; // Глобальный массив товаров
+let products = []; 
 let currentProductId = null;
 let selectedSize = null;
 window.selectedPVZ = JSON.parse(localStorage.getItem('selectedPVZ')) || { city: '', address: '', details: '' };
@@ -34,7 +35,6 @@ const categories = [
 function seedTestProduct() {
   window.db.collection('products').get().then(snap => {
     if(snap.empty) {
-      console.log("[DB] Добавляем тестовый товар...");
       window.db.collection('products').add({
         name: "Nike Air Max 97 Silver", price: 14990, category: "designer",
         sizes: ["39","40","41","42","43","44"],
@@ -47,22 +47,20 @@ function seedTestProduct() {
   });
 }
 
-// === 4. LIVE PRODUCT LOADER (ИСПРАВЛЕНО) ===
-// Теперь эта функция следит за базой в реальном времени
+// === 4. LIVE PRODUCT LOADER ===
 function loadProducts() {
   console.log("[DB] Запуск слушателя товаров...");
   window.db.collection('products').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
     products = [];
     snapshot.forEach(d => { 
       const data = d.data(); 
-      data.id = d.id; // Важно: сохраняем ID документа для редактирования
+      data.id = d.id; 
       products.push(data); 
     });
     console.log(`[DB] Загружено ${products.length} товаров`);
-    
-    // Мгновенно обновляем сетки на сайте
     renderGrid('home-grid', products.slice(0,4));
     renderGrid('catalog-grid', products);
+    renderAdminProductsList(); // Обновляем список в админке тоже
   }, (error) => {
     console.error("[DB] Ошибка слушателя:", error);
   });
@@ -131,7 +129,7 @@ window.addToCart = id => {
   localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart();
 };
 
-// === 7. CART ===
+// === 7. CART & CHECKOUT (FIXED) ===
 const updateCart = () => {
   const badge = document.getElementById('cart-badge'); if(badge) badge.textContent = window.cart.reduce((s,i)=>s+(i.qty||1),0);
   const empty = document.getElementById('cart-empty'), layout = document.getElementById('cart-layout');
@@ -146,6 +144,68 @@ const updateCart = () => {
 };
 window.changeQty = (idx,d) => { window.cart[idx].qty=(window.cart[idx].qty||1)+d; if(window.cart[idx].qty<1)window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 window.removeItem = idx => { window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
+
+window.checkout = async () => {
+  console.log("[CHECKOUT] Начало оформления...");
+  const btn = document.getElementById('checkout-btn');
+  const user = window.auth.currentUser;
+  
+  if(!user) { 
+    window.navigate('profile'); 
+    return alert('⚠️ Для оформления заказа необходимо войти в аккаунт'); 
+  }
+  if(!window.cart.length) return alert('⚠️ Корзина пуста');
+  
+  // Проверка адреса
+  const addr = `${window.selectedPVZ.city||''}, ${window.selectedPVZ.address||''} ${window.selectedPVZ.details||''}`.replace(/,\s*,/g,',').trim();
+  if(!addr || addr === ', ') {
+    window.openPVZModal();
+    return alert('⚠️ Пожалуйста, укажите адрес доставки в Профиле -> Адрес доставки');
+  }
+
+  const total = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
+  
+  // Блокируем кнопку
+  btn.disabled = true;
+  btn.textContent = '⏳ Оформление...';
+  
+  try {
+    await window.db.collection('orders').add({
+      userId: user.email, 
+      userName: user.displayName||user.email.split('@')[0],
+      items: window.cart.map(i=>`${i.name} (${i.size||'?'})`).join(', '),
+      total: total.toLocaleString('ru'), 
+      address: addr, 
+      status: 'new', 
+      qrImage: '',
+      date: new Date().toISOString(), 
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Очищаем корзину
+    window.cart.forEach(it=>{ 
+      if(!window.purchasedProducts.some(p=>p.id===it.id&&p.user===user.email)) 
+        window.purchasedProducts.push({id:it.id,user:user.email,date:new Date().toISOString()}); 
+    });
+    localStorage.setItem('purchasedProducts',JSON.stringify(window.purchasedProducts));
+    orderCount++; 
+    localStorage.setItem('orderCount',orderCount);
+    
+    window.cart=[]; 
+    localStorage.setItem('cart','[]'); 
+    updateCart();
+    
+    alert('✅ Заказ успешно оформлен!\nАдрес: ' + addr);
+    window.navigate('my-orders');
+    
+  } catch(e) {
+    console.error("Checkout Error:", e);
+    alert('❌ Ошибка при оформлении: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Оформить заказ';
+  }
+};
 
 // === 8. ADDRESS ===
 window.openPVZModal = () => {
@@ -165,27 +225,7 @@ window.savePVZ = () => {
   alert('✅ Адрес сохранён'); window.closePVZModal();
 };
 
-// === 9. CHECKOUT ===
-window.checkout = () => {
-  const user = window.auth.currentUser;
-  if(!user) { window.navigate('profile'); return alert('Войдите в аккаунт'); }
-  if(!window.cart.length) return;
-  const addr = `${window.selectedPVZ.city||''}, ${window.selectedPVZ.address||''} ${window.selectedPVZ.details||''}`.replace(/,\s*,/g,',').trim() || 'Не указан';
-  const total = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
-  window.db.collection('orders').add({
-    userId: user.email, userName: user.displayName||user.email.split('@')[0],
-    items: window.cart.map(i=>`${i.name} (${i.size||'?'})`).join(', '),
-    total: total.toLocaleString('ru'), address: addr, status: 'new', qrImage: '',
-    date: new Date().toISOString(), createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(()=>{
-    window.cart.forEach(it=>{ if(!window.purchasedProducts.some(p=>p.id===it.id&&p.user===user.email)) window.purchasedProducts.push({id:it.id,user:user.email,date:new Date().toISOString()}); });
-    localStorage.setItem('purchasedProducts',JSON.stringify(window.purchasedProducts));
-    orderCount++; localStorage.setItem('orderCount',orderCount);
-    alert('✅ Заказ оформлен'); window.cart=[]; localStorage.setItem('cart','[]'); updateCart();
-  }).catch(e=>alert('❌ '+e.message));
-};
-
-// === 10. ORDERS (CLIENT) ===
+// === 9. ORDERS (CLIENT) ===
 let ordersListener = null;
 window.renderOrders = () => {
   const c = document.getElementById('my-orders-list'); if(!c) return;
@@ -204,11 +244,10 @@ window.renderOrders = () => {
   });
 };
 
-// === 11. ADMIN DASHBOARD (FIXED) ===
+// === 10. ADMIN DASHBOARD (WITH IMAGE UPLOAD) ===
 function showToast(msg){const t=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 function renderAdmin() {
-  // Stats
   window.db.collection('orders').get().then(snap=>{
     let rev=0, users=new Set();
     snap.forEach(d=>{const o=d.data(); rev+=parseFloat(o.total.replace(/\s|₽/g,''))||0; users.add(o.userId);});
@@ -216,13 +255,11 @@ function renderAdmin() {
     document.getElementById('stat-revenue').textContent=rev.toLocaleString('ru')+' ₽';
     document.getElementById('stat-users').textContent=users.size;
   });
-  // Products count is handled by listener now, but we can trigger admin list render
   renderAdminProductsList();
 }
 
 function renderAdminProductsList() {
   const list = document.getElementById('admin-products-list');
-  // Используем глобальный массив products, который обновляется в реальном времени
   if(!list) return;
   list.innerHTML = products.length === 0 ? '<p style="color:var(--muted)">Товаров нет</p>' : products.map(p => {
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border)">
@@ -235,8 +272,28 @@ function renderAdminProductsList() {
   }).join('');
 }
 
+// Image Upload Logic
+const compressImage = (file, maxWidth = 800) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.src = e.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width, height = img.height;
+        if(width > maxWidth) { height *= maxWidth/width; width = maxWidth; }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => resolve(new File([blob], file.name, {type: 'image/jpeg'})), 'image/jpeg', 0.8);
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 window.saveProduct = async () => {
-  console.log("[ADMIN] Попытка сохранения...");
+  console.log("[ADMIN] Сохранение товара...");
   const btn = document.getElementById('prod-submit-btn');
   const editId = document.getElementById('edit-prod-id').value;
   const name = document.getElementById('new-prod-name').value.trim();
@@ -246,10 +303,34 @@ window.saveProduct = async () => {
   
   btn.disabled = true; btn.textContent = '⏳ Сохранение...';
   
+  let imgUrl = document.getElementById('new-prod-img').value.trim();
+  const fileInput = document.getElementById('new-prod-file');
+  
+  // Если выбран файл, загружаем в Storage
+  if(fileInput.files[0]) {
+    try {
+      btn.textContent = '⏳ Загрузка фото...';
+      const file = fileInput.files[0];
+      const compressed = await compressImage(file);
+      const fileName = `products/${Date.now()}_${compressed.name}`;
+      const ref = window.storage.ref(fileName);
+      await ref.put(compressed);
+      imgUrl = await ref.getDownloadURL();
+      console.log("[STORAGE] Фото загружено:", imgUrl);
+    } catch(e) {
+      console.error(e);
+      alert('❌ Ошибка загрузки фото: ' + e.message);
+      btn.disabled = false; btn.textContent = '💾 Опубликовать товар';
+      return;
+    }
+  }
+  
+  if(!imgUrl) imgUrl = '👟'; // Default emoji if no link and no file
+
   const prodData = {
     name, price: Number(price), category: document.getElementById('new-prod-cat').value,
     sizes: document.getElementById('new-prod-sizes').value.split(',').map(s=>s.trim()).filter(Boolean),
-    images: document.getElementById('new-prod-img').value.trim() ? [document.getElementById('new-prod-img').value.trim()] : ['👟'],
+    images: [imgUrl],
     desc: document.getElementById('new-prod-desc').value,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -265,7 +346,6 @@ window.saveProduct = async () => {
       showToast('✅ Товар опубликован в каталоге');
     }
     window.cancelEdit();
-    // renderAdminProductsList() вызовется автоматически через loadProducts (onSnapshot)
   } catch(e) {
     console.error(e);
     alert('❌ Ошибка сохранения: ' + e.message);
@@ -287,6 +367,15 @@ window.editProduct = (id) => {
   document.getElementById('new-prod-img').value = (p.images?.[0]?.startsWith('http')) ? p.images[0] : '';
   document.getElementById('new-prod-desc').value = p.desc||'';
   
+  // Preview image if exists
+  const preview = document.getElementById('img-preview');
+  if(p.images?.[0]?.startsWith('http')) {
+    preview.style.display = 'block';
+    preview.innerHTML = `<img src="${p.images[0]}" style="width:100%;height:100%;object-fit:cover">`;
+  } else {
+    preview.style.display = 'none';
+  }
+  
   document.getElementById('form-title').textContent = '✏️ Редактирование товара';
   const btn = document.getElementById('prod-submit-btn');
   btn.textContent = '💾 Сохранить изменения';
@@ -298,6 +387,8 @@ window.cancelEdit = () => {
   document.getElementById('edit-prod-id').value = '';
   ['new-prod-name','new-prod-price','new-prod-sizes','new-prod-img','new-prod-desc'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('new-prod-cat').value = 'designer';
+  document.getElementById('new-prod-file').value = '';
+  document.getElementById('img-preview').style.display = 'none';
   document.getElementById('form-title').textContent = '📦 Добавить новый товар';
   document.getElementById('prod-submit-btn').textContent = '💾 Опубликовать товар';
   document.getElementById('cancel-edit-btn').style.display = 'none';
@@ -307,11 +398,26 @@ window.deleteProduct = (id) => {
   if(!confirm('🗑 Удалить этот товар из каталога?')) return;
   window.db.collection('products').doc(id).delete().then(()=>{
     showToast('🗑 Товар удалён'); 
-    // onSnapshot обновит список автоматически
   });
 };
 
-// === 12. SUPPORT CHAT ===
+// Preview on file select
+document.getElementById('new-prod-file')?.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  const preview = document.getElementById('img-preview');
+  if(file && file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      preview.style.display = 'block';
+      preview.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+// === 11. SUPPORT CHAT ===
 const faqDB = {
   'доставк|сроки|когда придет|где мой': '🚚 Доставка 1-3 дня. Бесплатно от 5000₽.',
   'возврат|вернуть|деньги назад|отказ|не понравился': '↩️ Возврат 14 дней. Курьер заберёт бесплатно.',
@@ -339,7 +445,7 @@ window.sendChatMessage = () => {
   },400);
 };
 
-// === 13. AUTH ===
+// === 12. AUTH ===
 const authForm=document.getElementById('auth-form');
 if(authForm){
   let isLogin=true;
@@ -378,7 +484,7 @@ if(authForm){
   document.getElementById('logout-btn').onclick=()=>{window.auth.signOut();alert('✅ Вы вышли');};
 }
 
-// === 14. INIT ===
+// === 13. INIT ===
 seedTestProduct(); 
-loadProducts(); // Запускает LIVE-режим
+loadProducts(); 
 updateCart();
