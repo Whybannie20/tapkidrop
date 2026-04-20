@@ -14,9 +14,25 @@ try {
   window.storage = firebase.storage();
   window.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
   console.log("[FB] Инициализация завершена");
-} catch (e) { console.error("[FB] Ошибка инициализации:", e); }
+} catch (e) { console.error("[FB] Ошибка:", e); }
 
-// === 2. GLOBALS ===
+// === 2. TELEGRAM NOTIFIER (FIXED) ===
+const TG_BOT_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
+const TG_ADMIN_CHAT_ID = "-1003371505343";
+
+function sendTelegram(orderData) {
+  console.log("[TG] Отправка уведомления...");
+  const text = `📦 <b>НОВЫЙ ЗАКАЗ #${String(orderData.id).slice(-4)}</b>\n👤 ${orderData.userName || orderData.userId}\n🛍️ ${orderData.items}\n📍 ${orderData.address}\n💰 <b>${orderData.total} ₽</b>`;
+  fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: TG_ADMIN_CHAT_ID, text, parse_mode: 'HTML' })
+  }).then(res => res.json()).then(data => {
+    if(data.ok) console.log("[TG] ✅ Уведомление доставлено");
+    else console.error("[TG] ❌ Ошибка TG API:", data.description);
+  }).catch(e => console.error("[TG] ❌ Сетевая ошибка:", e));
+}
+
+// === 3. GLOBALS ===
 const ADMIN_EMAILS = ['antoniobandero11@gmail.com', 'buldozer.mas12@gmail.com'];
 window.cart = JSON.parse(localStorage.getItem('cart')) || [];
 let orderCount = parseInt(localStorage.getItem('orderCount')) || 0;
@@ -26,54 +42,48 @@ let currentProductId = null;
 let selectedSize = null;
 window.selectedPVZ = JSON.parse(localStorage.getItem('selectedPVZ')) || { city: '', address: '', details: '' };
 
+let productsUnsub = null;
+let ordersUnsub = null;
+
 const categories = [
   {id:'all',name:'Все'},{id:'designer',name:'Дизайнерские'},{id:'kids',name:'Детские'},
   {id:'swag',name:'Сваг'},{id:'classics',name:'Классика'},{id:'sale',name:'Распродажа'}
 ];
 
-// === 3. SEED TEST PRODUCT ===
+// === 4. SEED TEST PRODUCT ===
 function seedTestProduct() {
   window.db.collection('products').get().then(snap => {
     if(snap.empty) {
       console.log("[DB] Добавляем тестовый товар...");
       window.db.collection('products').add({
         name: "Nike Air Max 97 Silver", price: 14990, category: "designer",
-        sizes: ["39","40","41","42","43","44"],
-        desc: "Легендарная модель с системой амортизации Air.",
+        sizes: ["39","40","41","42","43","44"], desc: "Легендарная модель.",
         images: ["https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"],
-        rating: 4.9, reviews: 128,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        rating: 4.9, reviews: 128, createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
-  });
+  }).catch(e => console.error("[DB] Seed error:", e));
 }
 
-// === 4. LIVE PRODUCT LOADER ===
+// === 5. LIVE DATA LOADERS ===
 function loadProducts() {
-  console.log("[DB] Запуск слушателя товаров...");
-  window.db.collection('products').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+  if(productsUnsub) productsUnsub();
+  productsUnsub = window.db.collection('products').orderBy('createdAt', 'desc').onSnapshot(snap => {
     products = [];
-    snapshot.forEach(d => { 
-      const data = d.data(); 
-      data.id = d.id; 
-      products.push(data); 
-    });
-    console.log(`[DB] Загружено ${products.length} товаров`);
+    snap.forEach(d => { products.push({ id: d.id, ...d.data() }); });
+    console.log(`[DB] Товаров: ${products.length}`);
     renderGrid('home-grid', products.slice(0,4));
     renderGrid('catalog-grid', products);
-    renderAdminProductsList(); 
-  }, (error) => {
-    console.error("[DB] Ошибка слушателя:", error);
-  });
+    renderAdminProductsList();
+  }, e => console.error("[DB] Listener error:", e));
 }
 
 const renderGrid = (id, list) => {
   const el = document.getElementById(id); if(!el) return;
   el.innerHTML = list.map(p => {
     const img = p.images?.[0] || '👟';
-    const imgHtml = img.startsWith('http') ? `<img src="${img}">` : img;
     return `<div class="card" onclick="window.openProduct('${p.id}')">
-      <div class="card-img">${imgHtml}</div>
+      <div class="card-img">${img.startsWith('http') ? `<img src="${img}">` : img}</div>
       <div class="card-body">
         <div class="card-brand">${categories.find(c=>c.id===p.category)?.name||p.category}</div>
         <div class="card-name">${p.name}</div>
@@ -84,7 +94,7 @@ const renderGrid = (id, list) => {
   }).join('');
 };
 
-// === 5. NAVIGATION ===
+// === 6. NAVIGATION ===
 window.navigate = target => {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const el = document.getElementById(target); if(el) el.classList.add('active');
@@ -96,7 +106,7 @@ window.navigate = target => {
 };
 document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => window.navigate(b.dataset.target));
 
-// === 6. PRODUCT PAGE ===
+// === 7. PRODUCT & CART ===
 window.openProduct = id => {
   const p = products.find(x => x.id === id); if(!p) return;
   currentProductId = id; selectedSize = null;
@@ -130,7 +140,6 @@ window.addToCart = id => {
   localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart();
 };
 
-// === 7. CART & CHECKOUT (FIXED INFINITE LOADING) ===
 const updateCart = () => {
   const badge = document.getElementById('cart-badge'); if(badge) badge.textContent = window.cart.reduce((s,i)=>s+(i.qty||1),0);
   const empty = document.getElementById('cart-empty'), layout = document.getElementById('cart-layout');
@@ -146,6 +155,7 @@ const updateCart = () => {
 window.changeQty = (idx,d) => { window.cart[idx].qty=(window.cart[idx].qty||1)+d; if(window.cart[idx].qty<1)window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 window.removeItem = idx => { window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 
+// === 8. CHECKOUT (FIXED INFINITE LOADING + TG) ===
 window.checkout = async () => {
   console.log("[CHECKOUT] Старт...");
   const btn = document.getElementById('checkout-btn');
@@ -155,84 +165,49 @@ window.checkout = async () => {
   if(!window.cart.length) return alert('⚠️ Корзина пуста');
   
   const addr = `${window.selectedPVZ.city||''}, ${window.selectedPVZ.address||''} ${window.selectedPVZ.details||''}`.replace(/,\s*,/g,',').trim();
-  if(!addr || addr === ', ') {
-    window.openPVZModal();
-    return alert('⚠️ Укажите адрес доставки');
-  }
+  if(!addr || addr === ', ') { window.openPVZModal(); return alert('⚠️ Укажите адрес доставки'); }
 
   const total = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
   
-  // Блокируем кнопку
-  btn.disabled = true;
-  btn.textContent = '⏳ Оформление...';
+  btn.disabled = true; btn.textContent = '⏳ Оформление...';
   
   try {
-    console.log("[CHECKOUT] Отправка в базу...");
-    await window.db.collection('orders').add({
+    const orderRef = await window.db.collection('orders').add({
       userId: user.email, 
       userName: user.displayName||user.email.split('@')[0],
       items: window.cart.map(i=>`${i.name} (${i.size||'?'})`).join(', '),
-      total: total.toLocaleString('ru'), 
-      address: addr, 
-      status: 'new', 
-      qrImage: '',
-      date: new Date().toISOString(), 
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      total: total.toLocaleString('ru'), address: addr, status: 'new', qrImage: '',
+      date: new Date().toISOString(), createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     
-    window.cart.forEach(it=>{ 
-      if(!window.purchasedProducts.some(p=>p.id===it.id&&p.user===user.email)) 
-        window.purchasedProducts.push({id:it.id,user:user.email,date:new Date().toISOString()}); 
-    });
+    sendTelegram({ id: orderRef.id, userName: user.email, items: window.cart.map(i=>i.name).join(', '), address: addr, total: total.toLocaleString('ru') });
+    
+    window.cart.forEach(it=>{ if(!window.purchasedProducts.some(p=>p.id===it.id&&p.user===user.email)) window.purchasedProducts.push({id:it.id,user:user.email,date:new Date().toISOString()}); });
     localStorage.setItem('purchasedProducts',JSON.stringify(window.purchasedProducts));
-    orderCount++; 
-    localStorage.setItem('orderCount',orderCount);
-    
-    window.cart=[]; 
-    localStorage.setItem('cart','[]'); 
-    updateCart();
+    orderCount++; localStorage.setItem('orderCount',orderCount);
+    window.cart=[]; localStorage.setItem('cart','[]'); updateCart();
     
     alert('✅ Заказ оформлен!');
     window.navigate('my-orders');
-    
   } catch(e) {
-    console.error("Checkout Error:", e);
+    console.error("[CHECKOUT] Ошибка:", e);
     alert('❌ Ошибка: ' + e.message);
   } finally {
-    // ВСЕГДА разблокируем кнопку
-    console.log("[CHECKOUT] Завершено (finally)");
-    btn.disabled = false;
-    btn.textContent = 'Оформить заказ';
+    console.log("[CHECKOUT] Завершено");
+    btn.disabled = false; btn.textContent = 'Оформить заказ';
   }
 };
 
-// === 8. ADDRESS ===
-window.openPVZModal = () => {
-  document.getElementById('pvz-city').value = window.selectedPVZ.city||'';
-  document.getElementById('pvz-address').value = window.selectedPVZ.address||'';
-  document.getElementById('pvz-details').value = window.selectedPVZ.details||'';
-  document.getElementById('pvz-modal').style.display = 'flex';
-};
-window.closePVZModal = () => document.getElementById('pvz-modal').style.display = 'none';
-window.savePVZ = () => {
-  window.selectedPVZ = {
-    city: document.getElementById('pvz-city').value,
-    address: document.getElementById('pvz-address').value,
-    details: document.getElementById('pvz-details').value
-  };
-  localStorage.setItem('selectedPVZ', JSON.stringify(window.selectedPVZ));
-  alert('✅ Адрес сохранён'); window.closePVZModal();
-};
-
 // === 9. ORDERS (CLIENT) ===
-let ordersListener = null;
 window.renderOrders = () => {
   const c = document.getElementById('my-orders-list'); if(!c) return;
   const user = window.auth.currentUser;
   if(!user){ c.innerHTML='<p style="text-align:center;color:var(--muted);padding:20px">Войдите в аккаунт</p>'; return; }
-  if(ordersListener) ordersListener();
-  ordersListener = window.db.collection('orders').where('userId','==',user.email).orderBy('createdAt','desc').onSnapshot(snap=>{
-    c.innerHTML = snap.empty ? '<p style="text-align:center;color:var(--muted);padding:30px">Нет заказов</p>' : snap.docs.map(doc=>{
+  
+  if(ordersUnsub) ordersUnsub();
+  ordersUnsub = window.db.collection('orders').where('userId','==',user.email).orderBy('createdAt','desc').onSnapshot(snap=>{
+    if(snap.empty) { c.innerHTML='<p style="text-align:center;color:var(--muted);padding:30px">Нет заказов</p>'; return; }
+    c.innerHTML = snap.docs.map(doc=>{
       const o=doc.data(); o.id=doc.id;
       const sm={new:'Ожидает',assembling:'В сборке',shipping:'В пути',delivered:'Доставлен'};
       const sc=`status-${o.status}`;
@@ -240,125 +215,80 @@ window.renderOrders = () => {
       <div class="order-body"><div class="order-items">🛍️ ${o.items}</div><div>📍 ${o.address}</div></div><div class="order-price">${o.total} ₽</div>
       ${o.status==='delivered'&&o.qrImage?`<div class="qr-section"><div class="qr-label">📱 Код для получения:</div><img src="${o.qrImage}"><p style="font-size:0.75rem;color:var(--muted)">Покажите сотруднику ПВЗ</p></div>`:''}</div>`;
     }).join('');
-  });
+  }, e => { c.innerHTML=`<p style="color:var(--danger)">Ошибка загрузки заказов. Проверьте консоль.</p>`; console.error(e); });
 };
 
-// === 10. ADMIN DASHBOARD (FIXED HANGS) ===
+// === 10. ADMIN ===
 function showToast(msg){const t=document.getElementById('level-toast');document.getElementById('toast-desc').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 function renderAdmin() {
   window.db.collection('orders').get().then(snap=>{
-    let rev=0, users=new Set();
-    snap.forEach(d=>{const o=d.data(); rev+=parseFloat(o.total.replace(/\s|₽/g,''))||0; users.add(o.userId);});
+    let rev=0, users=new Set(); snap.forEach(d=>{const o=d.data(); rev+=parseFloat(o.total.replace(/\s|₽/g,''))||0; users.add(o.userId);});
     document.getElementById('stat-orders').textContent=snap.size;
     document.getElementById('stat-revenue').textContent=rev.toLocaleString('ru')+' ₽';
     document.getElementById('stat-users').textContent=users.size;
-  });
+  }).catch(e=>console.error(e));
   renderAdminProductsList();
 }
 
 function renderAdminProductsList() {
-  const list = document.getElementById('admin-products-list');
-  if(!list) return;
-  list.innerHTML = products.length === 0 ? '<p style="color:var(--muted)">Товаров нет</p>' : products.map(p => {
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border)">
+  const list = document.getElementById('admin-products-list'); if(!list) return;
+  list.innerHTML = products.length===0 ? '<p style="color:var(--muted)">Товаров нет</p>' : products.map(p => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border)">
       <div><b>${p.name}</b><br><small>${(p.price||0).toLocaleString('ru')} ₽ • ${p.category}</small></div>
       <div style="display:flex;gap:8px">
         <button class="btn" style="padding:6px 10px;font-size:0.8rem;background:var(--bg);border:1px solid var(--border)" onclick="window.editProduct('${p.id}')">✏️ Изменить</button>
         <button class="btn" style="padding:6px 10px;font-size:0.8rem;background:rgba(220,53,69,0.1);color:var(--danger);border:1px solid rgba(220,53,69,0.2)" onclick="window.deleteProduct('${p.id}')">🗑 Удалить</button>
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
-// Image Upload Logic
-const compressImage = (file, maxWidth = 800) => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      img.src = e.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width, height = img.height;
-        if(width > maxWidth) { height *= maxWidth/width; width = maxWidth; }
-        canvas.width = width; canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => resolve(new File([blob], file.name, {type: 'image/jpeg'})), 'image/jpeg', 0.8);
-      };
-    };
-    reader.readAsDataURL(file);
-  });
-};
-
 window.saveProduct = async () => {
-  console.log("[ADMIN] Старт сохранения товара...");
+  console.log("[ADMIN] Сохранение...");
   const btn = document.getElementById('prod-submit-btn');
   const editId = document.getElementById('edit-prod-id').value;
   const name = document.getElementById('new-prod-name').value.trim();
   const price = document.getElementById('new-prod-price').value;
-  
   if(!name || !price) return alert('❌ Заполните название и цену');
   
   btn.disabled = true; btn.textContent = '⏳ Сохранение...';
-  
   let imgUrl = document.getElementById('new-prod-img').value.trim();
   const fileInput = document.getElementById('new-prod-file');
   
   try {
-    // 1. Загрузка фото (если есть файл)
     if(fileInput.files[0]) {
-      console.log("[ADMIN] Загрузка фото...");
       btn.textContent = '⏳ Загрузка фото...';
       const file = fileInput.files[0];
-      const compressed = await compressImage(file);
-      const fileName = `products/${Date.now()}_${compressed.name}`;
-      const ref = window.storage.ref(fileName);
-      await ref.put(compressed);
+      const ref = window.storage.ref(`products/${Date.now()}_${file.name}`);
+      await ref.put(file);
       imgUrl = await ref.getDownloadURL();
-      console.log("[STORAGE] Фото загружено:", imgUrl);
     }
-    
-    if(!imgUrl) imgUrl = '👟'; 
+    if(!imgUrl) imgUrl = '👟';
 
+    btn.textContent = editId ? '⏳ Обновление...' : '⏳ Публикация...';
     const prodData = {
       name, price: Number(price), category: document.getElementById('new-prod-cat').value,
       sizes: document.getElementById('new-prod-sizes').value.split(',').map(s=>s.trim()).filter(Boolean),
-      images: [imgUrl],
-      desc: document.getElementById('new-prod-desc').value,
+      images: [imgUrl], desc: document.getElementById('new-prod-desc').value,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-
-    // 2. Сохранение в БД
-    console.log("[ADMIN] Сохранение в базу...");
-    btn.textContent = editId ? '⏳ Обновление...' : '⏳ Публикация...';
     
-    if(editId) {
-      await window.db.collection('products').doc(editId).set(prodData, {merge: true});
-      showToast('✅ Товар обновлён');
-    } else {
-      prodData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      prodData.rating = 5.0; prodData.reviews = 0;
-      await window.db.collection('products').add(prodData);
-      showToast('✅ Товар опубликован');
-    }
+    if(editId) await window.db.collection('products').doc(editId).set(prodData, {merge: true});
+    else { prodData.createdAt = firebase.firestore.FieldValue.serverTimestamp(); prodData.rating=5; prodData.reviews=0; await window.db.collection('products').add(prodData); }
+    
+    showToast(editId ? '✅ Товар обновлён' : '✅ Товар опубликован');
     window.cancelEdit();
-    
   } catch(e) {
-    console.error("[ADMIN] Ошибка сохранения:", e);
-    alert('❌ Ошибка: ' + e.message + '\n\nПроверьте консоль (F12) для деталей.');
+    console.error("[ADMIN] Ошибка:", e);
+    alert('❌ Ошибка: ' + e.message);
   } finally {
-    // ВСЕГДА разблокируем
-    console.log("[ADMIN] Завершено (finally)");
-    btn.disabled = false;
-    btn.textContent = editId ? '💾 Сохранить изменения' : '💾 Опубликовать товар';
+    console.log("[ADMIN] Завершено");
+    btn.disabled = false; btn.textContent = editId ? '💾 Сохранить изменения' : '💾 Опубликовать товар';
   }
 };
 
 window.editProduct = (id) => {
-  const p = products.find(x => x.id === id);
-  if(!p) return alert('Товар не найден');
-  
+  const p = products.find(x => x.id === id); if(!p) return;
   document.getElementById('edit-prod-id').value = id;
   document.getElementById('new-prod-name').value = p.name||'';
   document.getElementById('new-prod-price').value = p.price||'';
@@ -368,20 +298,14 @@ window.editProduct = (id) => {
   document.getElementById('new-prod-desc').value = p.desc||'';
   
   const preview = document.getElementById('img-preview');
-  if(p.images?.[0]?.startsWith('http')) {
-    preview.style.display = 'block';
-    preview.innerHTML = `<img src="${p.images[0]}" style="width:100%;height:100%;object-fit:cover">`;
-  } else {
-    preview.style.display = 'none';
-  }
+  if(p.images?.[0]?.startsWith('http')) { preview.style.display='block'; preview.innerHTML=`<img src="${p.images[0]}" style="width:100%;height:100%;object-fit:cover">`; } 
+  else preview.style.display='none';
   
-  document.getElementById('form-title').textContent = '✏️ Редактирование товара';
-  const btn = document.getElementById('prod-submit-btn');
-  btn.textContent = '💾 Сохранить изменения';
+  document.getElementById('form-title').textContent = '✏️ Редактирование';
+  document.getElementById('prod-submit-btn').textContent = '💾 Сохранить изменения';
   document.getElementById('cancel-edit-btn').style.display = 'block';
   window.scrollTo({top:0, behavior:'smooth'});
 };
-
 window.cancelEdit = () => {
   document.getElementById('edit-prod-id').value = '';
   ['new-prod-name','new-prod-price','new-prod-sizes','new-prod-img','new-prod-desc'].forEach(id=>document.getElementById(id).value='');
@@ -392,42 +316,14 @@ window.cancelEdit = () => {
   document.getElementById('prod-submit-btn').textContent = '💾 Опубликовать товар';
   document.getElementById('cancel-edit-btn').style.display = 'none';
 };
+window.deleteProduct = (id) => { if(confirm('🗑 Удалить?')) window.db.collection('products').doc(id).delete().then(()=>showToast('🗑 Удалено')).catch(e=>alert(e.message)); };
 
-window.deleteProduct = (id) => {
-  if(!confirm('🗑 Удалить этот товар?')) return;
-  window.db.collection('products').doc(id).delete().then(()=> showToast('🗑 Товар удалён')).catch(e => alert(e.message));
-};
-
-// Update Status (FIXED HANG)
 window.updateStatus = (id, status) => {
-  console.log(`[ADMIN] Изменение статуса ${id} на ${status}...`);
-  // Не блокируем весь интерфейс, просто меняем статус в фоне
+  console.log(`[ADMIN] Статус ${id} -> ${status}`);
   window.db.collection('orders').doc(id).update({ status })
-    .then(() => {
-      console.log("[ADMIN] Статус обновлен");
-      showToast(`Статус изменен на "${status}"`);
-    })
-    .catch(e => {
-      console.error(e);
-      alert('❌ Ошибка обновления статуса: ' + e.message);
-    });
+    .then(() => showToast(`✅ Статус изменен на "${status}"`))
+    .catch(e => alert('❌ ' + e.message));
 };
-
-// Preview on file select
-document.getElementById('new-prod-file')?.addEventListener('change', function(e) {
-  const file = e.target.files[0];
-  const preview = document.getElementById('img-preview');
-  if(file && file.type.startsWith('image/')) {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      preview.style.display = 'block';
-      preview.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover">`;
-    };
-    reader.readAsDataURL(file);
-  } else {
-    preview.style.display = 'none';
-  }
-});
 
 // === 11. SUPPORT CHAT ===
 const faqDB = {
