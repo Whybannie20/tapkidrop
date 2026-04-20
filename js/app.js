@@ -16,20 +16,35 @@ try {
   console.log("[FB] Инициализация завершена");
 } catch (e) { console.error("[FB] Ошибка:", e); }
 
-// === 2. TELEGRAM NOTIFIER (FIXED) ===
+// === 2. TELEGRAM CONFIG & SENDER ===
 const TG_BOT_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
 const TG_ADMIN_CHAT_ID = "-1003371505343";
 
-function sendTelegram(orderData) {
+async function sendTelegramNotification(data) {
   console.log("[TG] Отправка уведомления...");
-  const text = `📦 <b>НОВЫЙ ЗАКАЗ #${String(orderData.id).slice(-4)}</b>\n👤 ${orderData.userName || orderData.userId}\n🛍️ ${orderData.items}\n📍 ${orderData.address}\n💰 <b>${orderData.total} ₽</b>`;
-  fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: TG_ADMIN_CHAT_ID, text, parse_mode: 'HTML' })
-  }).then(res => res.json()).then(data => {
-    if(data.ok) console.log("[TG] ✅ Уведомление доставлено");
-    else console.error("[TG] ❌ Ошибка TG API:", data.description);
-  }).catch(e => console.error("[TG] ❌ Сетевая ошибка:", e));
+  const text = `📦 <b>НОВЫЙ ЗАКАЗ #${String(data.id).slice(-6)}</b>
+👤 <b>Клиент:</b> ${data.userName}
+📧 <b>Email:</b> ${data.email}
+📍 <b>Адрес:</b> ${data.address}
+
+🛍️ <b>Состав заказа:</b>
+${data.items}
+
+💰 <b>Итого к оплате:</b> ${data.total}
+📅 <b>Дата:</b> ${data.date}`;
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TG_ADMIN_CHAT_ID, text, parse_mode: 'HTML' })
+    });
+    const result = await res.json();
+    if(result.ok) console.log("[TG] ✅ Уведомление доставлено");
+    else console.error("[TG] ❌ Ошибка API:", result.description);
+  } catch(e) {
+    console.error("[TG] ❌ Сетевая ошибка:", e);
+  }
 }
 
 // === 3. GLOBALS ===
@@ -155,46 +170,73 @@ const updateCart = () => {
 window.changeQty = (idx,d) => { window.cart[idx].qty=(window.cart[idx].qty||1)+d; if(window.cart[idx].qty<1)window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 window.removeItem = idx => { window.cart.splice(idx,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 
-// === 8. CHECKOUT (FIXED INFINITE LOADING + TG) ===
+// === 8. CHECKOUT (IRONCLAD FLOW) ===
 window.checkout = async () => {
-  console.log("[CHECKOUT] Старт...");
+  console.log("[CHECKOUT] Старт оформления...");
   const btn = document.getElementById('checkout-btn');
   const user = window.auth.currentUser;
+
+  // 1. Проверки
+  if (!user) { window.navigate('profile'); return alert('⚠️ Войдите в аккаунт'); }
+  if (!window.cart.length) return alert('⚠️ Корзина пуста');
   
-  if(!user) { window.navigate('profile'); return alert('⚠️ Войдите в аккаунт'); }
-  if(!window.cart.length) return alert('⚠️ Корзина пуста');
-  
+  // 2. Проверка адреса
   const addr = `${window.selectedPVZ.city||''}, ${window.selectedPVZ.address||''} ${window.selectedPVZ.details||''}`.replace(/,\s*,/g,',').trim();
-  if(!addr || addr === ', ') { window.openPVZModal(); return alert('⚠️ Укажите адрес доставки'); }
+  if (!addr || addr === ', ') {
+    window.openPVZModal();
+    return alert('⚠️ Укажите адрес доставки перед оформлением');
+  }
 
   const total = window.cart.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
-  
+  const itemsText = window.cart.map(i => `• ${i.name} (Размер: ${i.size||'?'}) — ${(i.price||0).toLocaleString('ru')} ₽`).join('\n');
+
+  // 3. Блокировка UI
   btn.disabled = true; btn.textContent = '⏳ Оформление...';
-  
+
   try {
+    console.log("[CHECKOUT] Сохранение заказа в БД...");
     const orderRef = await window.db.collection('orders').add({
       userId: user.email, 
-      userName: user.displayName||user.email.split('@')[0],
-      items: window.cart.map(i=>`${i.name} (${i.size||'?'})`).join(', '),
-      total: total.toLocaleString('ru'), address: addr, status: 'new', qrImage: '',
-      date: new Date().toISOString(), createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      userName: user.displayName || user.email.split('@')[0],
+      email: user.email,
+      items: itemsText,
+      total: total.toLocaleString('ru') + ' ₽', 
+      address: addr, 
+      status: 'new', qrImage: '',
+      date: new Date().toISOString(), 
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    
-    sendTelegram({ id: orderRef.id, userName: user.email, items: window.cart.map(i=>i.name).join(', '), address: addr, total: total.toLocaleString('ru') });
-    
+    console.log("[CHECKOUT] Заказ сохранен ID:", orderRef.id);
+
+    // 4. Отправка в ТГ (не блокируем успех, но ждем ответа)
+    await sendTelegramNotification({
+      id: orderRef.id,
+      userName: orderRef.userName,
+      email: orderRef.email,
+      items: itemsText,
+      address: addr,
+      total: orderRef.total,
+      date: new Date().toLocaleString('ru-RU')
+    });
+
+    // 5. Обновление локальных данных
     window.cart.forEach(it=>{ if(!window.purchasedProducts.some(p=>p.id===it.id&&p.user===user.email)) window.purchasedProducts.push({id:it.id,user:user.email,date:new Date().toISOString()}); });
     localStorage.setItem('purchasedProducts',JSON.stringify(window.purchasedProducts));
     orderCount++; localStorage.setItem('orderCount',orderCount);
     window.cart=[]; localStorage.setItem('cart','[]'); updateCart();
     
-    alert('✅ Заказ оформлен!');
+    console.log("[CHECKOUT] Успех, перенаправление...");
+    alert('✅ Заказ успешно оформлен!\nМенеджер свяжется с вами для подтверждения.');
     window.navigate('my-orders');
+    
   } catch(e) {
-    console.error("[CHECKOUT] Ошибка:", e);
-    alert('❌ Ошибка: ' + e.message);
+    console.error("[CHECKOUT] КРИТИЧЕСКАЯ ОШИБКА:", e);
+    alert('❌ Ошибка оформления: ' + e.message);
   } finally {
+    // 6. Гарантия разблокировки кнопки
     console.log("[CHECKOUT] Завершено");
-    btn.disabled = false; btn.textContent = 'Оформить заказ';
+    btn.disabled = false; 
+    btn.textContent = 'Оформить заказ';
   }
 };
 
@@ -211,8 +253,8 @@ window.renderOrders = () => {
       const o=doc.data(); o.id=doc.id;
       const sm={new:'Ожидает',assembling:'В сборке',shipping:'В пути',delivered:'Доставлен'};
       const sc=`status-${o.status}`;
-      return `<div class="order-card ${sc}"><div class="order-head"><span class="order-id">#${String(o.id).slice(-6).toUpperCase()}</span><span class="status-badge ${sc}">${sm[o.status]}</span></div>
-      <div class="order-body"><div class="order-items">🛍️ ${o.items}</div><div>📍 ${o.address}</div></div><div class="order-price">${o.total} ₽</div>
+      return `<div class="order-card ${sc}"><div class="order-head"><span class="order-id">#${String(o.id).slice(-6)}</span><span class="status-badge ${sc}">${sm[o.status]}</span></div>
+      <div class="order-body"><div class="order-items">🛍️ ${o.items}</div><div>📍 ${o.address}</div></div><div class="order-price">${o.total}</div>
       ${o.status==='delivered'&&o.qrImage?`<div class="qr-section"><div class="qr-label">📱 Код для получения:</div><img src="${o.qrImage}"><p style="font-size:0.75rem;color:var(--muted)">Покажите сотруднику ПВЗ</p></div>`:''}</div>`;
     }).join('');
   }, e => { c.innerHTML=`<p style="color:var(--danger)">Ошибка загрузки заказов. Проверьте консоль.</p>`; console.error(e); });
@@ -325,7 +367,7 @@ window.updateStatus = (id, status) => {
     .catch(e => alert('❌ ' + e.message));
 };
 
-// === 11. SUPPORT CHAT ===
+// === 11. SUPPORT & AUTH ===
 const faqDB = {
   'доставк|сроки|когда придет|где мой': '🚚 Доставка 1-3 дня. Бесплатно от 5000₽.',
   'возврат|вернуть|деньги назад|отказ|не понравился': '↩️ Возврат 14 дней. Курьер заберёт бесплатно.',
@@ -353,7 +395,6 @@ window.sendChatMessage = () => {
   },400);
 };
 
-// === 12. AUTH ===
 const authForm=document.getElementById('auth-form');
 if(authForm){
   let isLogin=true;
@@ -392,7 +433,7 @@ if(authForm){
   document.getElementById('logout-btn').onclick=()=>{window.auth.signOut();alert('✅ Вы вышли');};
 }
 
-// === 13. INIT ===
+// === 12. INIT ===
 seedTestProduct(); 
 loadProducts(); 
 updateCart();
