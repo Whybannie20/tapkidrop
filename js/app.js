@@ -1,4 +1,4 @@
-// === 1. INIT ===
+// === 1. SUPABASE INIT ===
 try {
   window.sb = supabase.createClient(
     "https://ccskkieoldeyqrpxxpnb.supabase.co",
@@ -26,7 +26,8 @@ window.go = (id) => {
 };
 document.querySelectorAll('.cat-btn').forEach(b => b.onclick = () => {
   document.querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
-  render(document.querySelector('.cat-btn.active').dataset.cat === 'all' ? prods : prods.filter(p=>p.category===document.querySelector('.cat-btn.active').dataset.cat));
+  const cat = b.dataset.cat;
+  render(cat==='all' ? prods : prods.filter(p=>p.category===cat));
 });
 document.getElementById('search-input')?.addEventListener('input', e => render(prods.filter(p => p.name.toLowerCase().includes(e.target.value.toLowerCase()))));
 
@@ -36,12 +37,19 @@ async function loadProds() {
   if(error) { console.error(error); return; }
   prods = data || [];
   render(prods.slice(0,4));
+  const cat = document.querySelector('.cat-btn.active')?.dataset.cat || 'all';
+  if(cat!=='all') render(prods.filter(p=>p.category===cat)); else render(prods);
 }
 
 function render(list) {
-  const g = document.getElementById('catalog-grid') || document.getElementById('home-grid');
-  if(!g) return;
+  const g = document.getElementById('catalog-grid'); if(!g) return;
   g.innerHTML = list.map(p => `
+    <div class="card" onclick="window.openProd('${p.id}')">
+      <div class="card-img">${p.image_url ? `<img src="${p.image_url}" onerror="this.parentElement.textContent='👟'">` : '👟'}</div>
+      <div class="card-body"><div class="card-brand">${p.category}</div><div class="card-name">${p.name}</div><div class="card-price"><span class="now">${p.price.toLocaleString('ru')} ₽</span></div><button class="btn-cart" onclick="event.stopPropagation(); window.addCart('${p.id}')">В корзину</button></div>
+    </div>`).join('');
+  const h = document.getElementById('home-grid');
+  if(h) h.innerHTML = list.slice(0,4).map(p => `
     <div class="card" onclick="window.openProd('${p.id}')">
       <div class="card-img">${p.image_url ? `<img src="${p.image_url}" onerror="this.parentElement.textContent='👟'">` : '👟'}</div>
       <div class="card-body"><div class="card-brand">${p.category}</div><div class="card-name">${p.name}</div><div class="card-price"><span class="now">${p.price.toLocaleString('ru')} ₽</span></div><button class="btn-cart" onclick="event.stopPropagation(); window.addCart('${p.id}')">В корзину</button></div>
@@ -50,7 +58,7 @@ function render(list) {
 
 window.openProd = (id) => {
   const p = prods.find(x=>x.id===id); if(!p) return;
-  window._cur = p;
+  window._cur = p; window._sz = null;
   document.getElementById('detail-img').innerHTML = p.image_url ? `<img src="${p.image_url}">` : '👟';
   document.getElementById('detail-brand').textContent = p.category;
   document.getElementById('detail-name').textContent = p.name;
@@ -66,32 +74,31 @@ window.addCart = (id) => {
   if(ex) ex.qty++; else window.cart.push({...p, qty:1});
   localStorage.setItem('cart', JSON.stringify(window.cart)); updateCart(); alert('✅ Добавлено');
 };
-window.addToCartFromDetail = () => { if(!window._cur || !window._sz) return alert('Выбери размер'); window.addCart(window._cur.id); };
+window.addToCartFromDetail = () => { if(!window._cur) return; if(!window._sz) return alert('Выбери размер'); window.addCart(window._cur.id); };
 
 function updateCart() {
   const b = document.getElementById('cart-badge'); if(b) b.textContent = window.cart.reduce((s,i)=>s+(i.qty||1),0);
   const emp = document.getElementById('cart-empty'), lay = document.getElementById('cart-layout');
   if(!emp || !lay) return;
   if(!window.cart.length) { emp.style.display='block'; lay.style.display='none'; return; }
-  emp.style.display='none'; lay.style.display='block';
-  document.getElementById('cart-items').innerHTML = window.cart.map((i,k) => `<div class="cart-item"><div class="cart-item-name">${i.name} (${i.size||'?'})</div><div class="cart-controls"><button onclick="chgQ(${k},-1)">−</button><span>${i.qty||1}</span><button onclick="chgQ(${k},1)">+</button><button style="color:red;background:none;border:none;cursor:pointer" onclick="rmQ(${k})">🗑</button></div></div>`).join('');
+  emp.style.display='none'; lay.style.display='grid';
+  document.getElementById('cart-items').innerHTML = window.cart.map((i,k) => `<div class="cart-item"><div class="cart-item-info"><div class="cart-item-name">${i.name}</div><div class="cart-item-meta">${i.price.toLocaleString('ru')} ₽ • ${i.size||'?'}</div><div class="cart-controls"><button class="qty-btn" onclick="chgQ(${k},-1)">−</button><span>${i.qty||1}</span><button class="qty-btn" onclick="chgQ(${k},1)">+</button><button style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer" onclick="rmQ(${k})">🗑</button></div></div></div>`).join('');
   document.getElementById('cart-total').textContent = window.cart.reduce((s,i)=>s+i.price*(i.qty||1),0).toLocaleString('ru')+' ₽';
 }
 window.chgQ = (k,d) => { window.cart[k].qty = Math.max(1, (window.cart[k].qty||1)+d); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 window.rmQ = (k) => { window.cart.splice(k,1); localStorage.setItem('cart',JSON.stringify(window.cart)); updateCart(); };
 
-// === 5. CHECKOUT (АДРЕС ТОЛЬКО ЗДЕСЬ) ===
+// === 5. CHECKOUT ===
 window.checkout = async () => {
   console.log("Checkout start");
   const btn = document.getElementById('checkout-btn');
-  const { data: { user } } = await window.sb.auth.getUser();
+  const {  { user } } = await window.sb.auth.getUser();
   if(!user) return alert('Войдите в аккаунт');
   if(!window.cart.length) return alert('Корзина пуста');
   
-  // ПРОВЕРКА АДРЕСА: если нет -> открываем окно и останавливаем
   if(!window.pvz.city || !window.pvz.addr) {
     window.openPVZ();
-    return alert('⚠️ Сначала укажите адрес доставки');
+    return alert('⚠️ Укажите адрес доставки');
   }
 
   const total = window.cart.reduce((s,i)=>s+i.price*(i.qty||1),0);
@@ -103,29 +110,35 @@ window.checkout = async () => {
     const {data:o, error} = await window.sb.from('orders').insert({ user_email: user.email, user_name: user.email.split('@')[0], items, total: total.toLocaleString('ru')+' ₽', address: addr, status: 'new' }).select().single();
     if(error) throw error;
     
-    // TG в фоне
     fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({chat_id:TG_CHAT, text:`📦 <b>ЗАКАЗ</b>\n👤 ${o.user_email}\n🛍️ ${o.items}\n💰 ${o.total}\n📍 ${o.address}`, parse_mode:'HTML'}) }).catch(console.error);
 
     window.cart = []; localStorage.setItem('cart','[]'); updateCart();
     alert('✅ Заказ оформлен!'); window.go('my-orders');
   } catch(e) { alert('❌ '+e.message); }
-  finally { btn.disabled = false; btn.textContent = 'Оформить'; }
+  finally { btn.disabled = false; btn.textContent = 'Оформить заказ'; }
 };
 
 // === 6. ORDERS ===
 window.loadOrders = async () => {
   const c = document.getElementById('my-orders-list');
-  const { data: { user } } = await window.sb.auth.getUser();
+  const {  { user } } = await window.sb.auth.getUser();
   if(!user) { c.innerHTML = 'Войдите'; return; }
   const {data} = await window.sb.from('orders').select('*').eq('user_email', user.email).order('created_at',{ascending:false});
-  c.innerHTML = data?.length ? data.map(o => `<div style="background:#fff;padding:12px;margin-bottom:10px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1)"><div style="display:flex;justify-content:space-between"><b>#${o.id.slice(0,8)}</b><span>${o.status}</span></div><div style="font-size:0.9rem;margin:4px 0">${o.items}</div><div>${o.address}</div><div style="font-weight:700">${o.total}</div>${o.qr_image_url?`<img src="${o.qr_image_url}" style="max-width:150px;margin-top:8px;border-radius:6px">`:''}</div>`).join('') : '<p style="text-align:center;color:#888">Нет заказов</p>';
+  c.innerHTML = data?.length ? data.map(o => `<div style="background:#fff;padding:12px;margin-bottom:10px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1)"><div style="display:flex;justify-content:space-between"><b>#${o.id.slice(0,8)}</b><span style="color:var(--primary);font-weight:600">${o.status}</span></div><div style="font-size:0.9rem;margin:4px 0">${o.items}</div><div>${o.address}</div><div style="font-weight:700">${o.total}</div>${o.qr_image_url?`<img src="${o.qr_image_url}" style="max-width:150px;margin-top:8px;border-radius:6px">`:''}</div>`).join('') : '<p style="text-align:center;color:#888">Нет заказов</p>';
 };
 
 // === 7. ADMIN ===
 async function loadAdmin() {
   const {count} = await window.sb.from('orders').select('*', {count:'exact',head:true});
   document.getElementById('st-orders').textContent = count||0;
-  document.getElementById('st-products').textContent = prods.length;
+  document.getElementById('st-prods').textContent = prods.length;
+  
+  // Примерная выручка
+  const {data: orders} = await window.sb.from('orders').select('total');
+  const rev = orders?.reduce((s,o)=>s+parseFloat(o.total.replace(/\s|₽/g,''))||0, 0) || 0;
+  document.getElementById('st-rev').textContent = rev.toLocaleString('ru') + ' ₽';
+  document.getElementById('st-users').textContent = new Set(await window.sb.from('orders').select('user_email')).size || 0; // Упрощенно
+
   const list = document.getElementById('admin-prods');
   list.innerHTML = prods.map(p => `<div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #eee"><span>${p.name} (${p.price}₽)</span><button onclick="window.delProd('${p.id}')" style="color:red;background:none;border:none;cursor:pointer">🗑</button></div>`).join('');
 }
@@ -135,22 +148,34 @@ window.addProd = async () => {
   if(!n||!p) return alert('Заполни имя и цену');
   const d = { name:n, price:p, category:document.getElementById('add-cat').value, sizes:document.getElementById('add-sizes').value.split(',').map(s=>s.trim()), image_url:document.getElementById('add-img').value, description:document.getElementById('add-desc').value };
   const btn = event.target; btn.disabled=true; btn.textContent='⏳...';
-  try { await window.sb.from('products').insert(d); alert('✅ Добавлено'); ['add-name','add-price','add-img','add-desc'].forEach(id=>document.getElementById(id).value=''); loadProds(); }
+  try { await window.sb.from('products').insert(d); alert('✅ Добавлено'); ['add-name','add-price','add-img','add-desc'].forEach(id=>document.getElementById(id).value=''); loadProds(); loadAdmin(); }
   catch(e) { alert('❌ '+e.message); } finally { btn.disabled=false; btn.textContent='💾 Опубликовать'; }
 };
 window.delProd = async (id) => { if(confirm('Удалить?')) { await window.sb.from('products').delete().eq('id',id); loadProds(); loadAdmin(); } };
 
-// === 8. AUTH ===
+// === 8. AUTH (ИСПРАВЛЕН ВХОД) ===
 let isLogin = true;
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); t.classList.add('active'); isLogin = t.dataset.tab==='login'; document.getElementById('auth-btn').textContent = isLogin?'Войти':'Регистрация';
 });
 document.getElementById('auth-form').onsubmit = async e => {
-  e.preventDefault(); const em = document.getElementById('email-in').value, pw = document.getElementById('pass-in').value;
+  e.preventDefault(); 
+  const em = document.getElementById('email-in').value, pw = document.getElementById('pass-in').value;
   const err = document.getElementById('auth-err'); err.style.display='none';
-  const {error} = isLogin ? await window.sb.auth.signInWithPassword({email:em,password:pw}) : await window.sb.auth.signUp({email:em,password:pw});
-  if(error) { err.textContent=error.message; err.style.display='block'; }
+  const btn = document.getElementById('auth-btn');
+  btn.disabled=true; btn.textContent='⏳...';
+  try {
+    if(isLogin) {
+      const {error} = await window.sb.auth.signInWithPassword({email:em,password:pw});
+      if(error) throw error;
+    } else {
+      const {error} = await window.sb.auth.signUp({email:em,password:pw});
+      if(error) throw error;
+    }
+  } catch(e) { err.textContent=e.message; err.style.display='block'; }
+  finally { btn.disabled=false; btn.textContent=isLogin?'Войти':'Регистрация'; }
 };
+
 window.sb.auth.onAuthStateChange((ev, sess) => {
   const u = sess?.user;
   document.getElementById('auth-flow').style.display = u?'none':'block';
@@ -160,23 +185,33 @@ window.sb.auth.onAuthStateChange((ev, sess) => {
 });
 document.getElementById('logout-btn').onclick = () => window.sb.auth.signOut();
 
-// === 9. MODALS & CHAT (ЧЕТКИЙ КОНТРОЛЬ) ===
-window.openPVZ = () => { document.getElementById('pvz-modal').style.display = 'flex'; };
+// === 9. MODALS & CHAT ===
+window.openPVZ = () => { 
+  document.getElementById('pvz-city').value = window.pvz.city||''; 
+  document.getElementById('pvz-addr').value = window.pvz.addr||''; 
+  document.getElementById('pvz-modal').style.display = 'flex'; 
+};
 window.closePVZ = () => { document.getElementById('pvz-modal').style.display = 'none'; };
-window.savePVZ = () => { window.pvz = {city:document.getElementById('pvz-city').value, addr:document.getElementById('pvz-addr').value}; localStorage.setItem('pvz',JSON.stringify(window.pvz)); window.closePVZ(); alert('✅ Адрес сохранён'); };
+window.savePVZ = () => { 
+  window.pvz = {city:document.getElementById('pvz-city').value, addr:document.getElementById('pvz-addr').value}; 
+  localStorage.setItem('pvz',JSON.stringify(window.pvz)); 
+  window.closePVZ(); alert('✅ Адрес сохранён'); 
+};
 
 window.openChat = () => { 
   document.getElementById('chat-modal').style.display = 'flex'; 
-  document.getElementById('chat-body').innerHTML = '<div style="background:#f0f0f0;padding:10px;border-radius:8px;align-self:flex-start">👋 Привет! Чем помочь?</div>'; 
+  document.getElementById('chat-body').innerHTML = '<div id="quick-questions" style="display:flex;flex-direction:column;gap:8px"><p style="font-size:0.85rem;color:var(--muted);margin-bottom:4px">Частые вопросы:</p><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Как оформить возврат?\')">↩️ Возврат</button><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Где мой заказ?\')">📦 Где заказ?</button><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Хочу к оператору\')">👨‍ Оператор</button></div>'; 
 };
 window.closeChat = () => { document.getElementById('chat-modal').style.display = 'none'; };
 window.sendMsg = () => {
   const inp=document.getElementById('chat-in'), txt=inp.value.trim(); if(!txt) return;
   const b=document.getElementById('chat-body');
+  const q = document.getElementById('quick-questions'); if(q) q.remove();
   b.innerHTML+=`<div style="background:var(--primary);color:#fff;padding:10px;border-radius:8px;align-self:end">${txt}</div>`;
   inp.value=''; b.scrollTop=b.scrollHeight;
   setTimeout(()=>{ b.innerHTML+=`<div style="background:#f0f0f0;padding:10px;border-radius:8px;align-self:flex-start">🤔 Оператор ответит скоро.</div>`; b.scrollTop=b.scrollHeight; },500);
 };
+window.sendMsgDirect = (txt) => { document.getElementById('chat-in').value=txt; window.sendMsg(); };
 
 // === 10. START ===
 loadProds(); updateCart();
