@@ -4,32 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ТапкиДроп</title>
-  <meta name="theme-color" content="#0a0a0a">
+  <meta name="theme-color" content="#ffffff">
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="ТапкиДроп">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👟</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 </head>
-<body class="app-loading">
-  <!-- Preloader -->
-  <div class="preloader">
-    <div class="preloader-logo">ТАПКИДРОП</div>
-    <div class="preloader-bar"><div class="preloader-fill"></div></div>
-  </div>
-
+<body>
   <header class="app-header">
     <div class="header-inner">
       <div class="logo" onclick="window.go('home')">ТАПКИДРОП</div>
       <div class="search-wrap">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="search-input" placeholder="Найти кроссовки...">
+        <input type="text" id="search-input" placeholder="Поиск...">
       </div>
       <button class="cart-btn" onclick="window.go('cart')">
         <i class="fa-solid fa-bag-shopping"></i>
@@ -39,7 +29,7 @@
   </header>
 
   <nav class="categories-nav">
-    <div class="nav-track">
+    <div class="container">
       <button class="cat-btn active" data-cat="all">Все</button>
       <button class="cat-btn" data-cat="designer">Дизайнерские</button>
       <button class="cat-btn" data-cat="kids">Детские</button>
@@ -53,24 +43,27 @@
     <section id="home" class="page active">
       <div class="container">
         <div class="promo-banner">
-          <div class="promo-content">
+          <div class="promo-text">
             <span class="promo-tag">DROP 2026</span>
             <h1>Стиль без компромиссов</h1>
-            <p>Культовые силуэты, лимитированные коллаборации, бескомпромиссное качество.</p>
-            <button class="btn btn--primary" onclick="window.go('catalog')">Смотреть каталог</button>
+            <button class="btn btn--primary" onclick="window.go('catalog')">В каталог</button>
           </div>
-          <div class="promo-visual">👟</div>
+          <div class="promo-img">👟</div>
         </div>
-        <div class="section-header"><h2>В тренде</h2><div class="section-line"></div></div>
+        <div class="section-header"><h2>В тренде</h2></div>
         <div class="grid" id="home-grid"></div>
       </div>
     </section>
 
-    <section id="catalog" class="page"><div class="container"><div class="grid" id="catalog-grid"></div></div></section>
+    <section id="catalog" class="page">
+      <div class="container">
+        <div class="grid" id="catalog-grid"></div>
+      </div>
+    </section>
 
     <section id="product" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.go('catalog')"><i class="fa-solid fa-arrow-left"></i> Каталог</button>
+        <button class="back-btn" onclick="window.go('catalog')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
         <div class="product-detail">
           <div class="product-media">
             <div class="main-img" id="detail-img">👟</div>
@@ -81,19 +74,25 @@
             <div class="price-block"><span class="current" id="detail-price">0 ₽</span></div>
             <p id="detail-desc" class="desc"></p>
             <div class="sizes" id="sizes-container"></div>
-            <button class="btn btn--primary full" onclick="window.addToCartFromDetail()">Добавить в корзину</button>
+            <button class="btn btn--primary full" onclick="window.addToCartFromDetail()">В корзину</button>
           </div>
         </div>
         <div class="reviews-section">
           <h3>Отзывы</h3>
-          <div id="reviews-list" class="reviews-list"></div>
-          <form id="review-form" class="review-form">
-            <div class="rating-picker">
+          <div id="reviews-list"></div>
+          <form id="review-form">
+            <div class="rating-select">
               <span>Оценка:</span>
-              <select id="review-rating" class="input"><option value="5">⭐⭐⭐⭐⭐</option><option value="4">⭐⭐⭐⭐</option><option value="3">⭐⭐⭐</option><option value="2">⭐⭐</option><option value="1">⭐</option></select>
+              <select id="review-rating" class="input">
+                <option value="5">⭐⭐⭐⭐⭐</option>
+                <option value="4">⭐⭐⭐⭐</option>
+                <option value="3">⭐⭐⭐</option>
+                <option value="2">⭐⭐</option>
+                <option value="1">⭐</option>
+              </select>
             </div>
-            <textarea id="review-comment" placeholder="Ваш опыт с этой моделью..." class="input" required></textarea>
-            <button type="submit" class="btn btn--primary" style="align-self:flex-start">Оставить отзыв</button>
+            <textarea id="review-comment" placeholder="Ваш отзыв..." class="input" required></textarea>
+            <button type="submit" class="btn btn--primary" style="align-self: flex-start">Оставить отзыв</button>
           </form>
         </div>
       </div>
@@ -105,14 +104,14 @@
         <div id="cart-empty" class="empty-state" style="display:none">
           <div class="empty-icon">🛒</div>
           <p>Корзина пуста</p>
-          <button class="btn btn--outline" onclick="window.go('catalog')">Перейти в каталог</button>
+          <button class="btn btn--primary" onclick="window.go('catalog')">В каталог</button>
         </div>
         <div id="cart-layout" style="display:none">
-          <div id="cart-items" class="cart-list"></div>
+          <div id="cart-items"></div>
           <div class="cart-summary">
             <div class="summary-row"><span>Доставка</span><span class="free">Бесплатно</span></div>
             <div class="summary-row total"><span>Итого</span><span id="cart-total">0 ₽</span></div>
-            <button class="btn btn--primary full" id="checkout-btn" onclick="window.checkout()">Оформить заказ</button>
+            <button class="btn btn--primary full" id="checkout-btn" onclick="window.checkout()">Оформить</button>
           </div>
         </div>
       </div>
@@ -120,15 +119,15 @@
 
     <section id="my-orders" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
+        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
         <h1>Мои заказы</h1>
-        <div id="my-orders-list" class="orders-list"></div>
+        <div id="my-orders-list"></div>
       </div>
     </section>
 
     <section id="profile" class="page">
       <div class="profile-header">
-        <div class="avatar-wrap"><i class="fa-regular fa-user"></i></div>
+        <div class="avatar-wrap">👤</div>
         <h2 id="profile-display-name">Гость</h2>
         <p id="profile-email">Войдите в аккаунт</p>
       </div>
@@ -136,13 +135,16 @@
         <div class="menu-grid">
           <div class="menu-item" onclick="window.go('my-orders')"><i class="fa-solid fa-bag-shopping"></i><span>Мои заказы</span><i class="fa-solid fa-chevron-right"></i></div>
           <div class="menu-item" onclick="window.editProfile()"><i class="fa-solid fa-user-pen"></i><span>Редактировать профиль</span><i class="fa-solid fa-chevron-right"></i></div>
-          <div class="menu-item" id="admin-menu" style="display:none" onclick="window.go('admin')"><i class="fa-solid fa-gear"></i><span>Админ-панель</span><i class="fa-solid fa-chevron-right"></i></div>
+          <div class="menu-item" id="admin-menu" style="display:none" onclick="window.go('admin')"><i class="fa-solid fa-gear"></i><span>Админка</span><i class="fa-solid fa-chevron-right"></i></div>
           <div class="menu-item" onclick="window.openPVZ()"><i class="fa-solid fa-location-dot"></i><span>Адрес доставки</span><i class="fa-solid fa-chevron-right"></i></div>
           <div class="menu-item" onclick="window.openChat()"><i class="fa-solid fa-headset"></i><span>Поддержка</span><i class="fa-solid fa-chevron-right"></i></div>
         </div>
         <div id="auth-flow" class="auth-flow">
           <div class="auth-card">
-            <div class="tabs"><button class="tab active" data-tab="login">Вход</button><button class="tab" data-tab="reg">Регистрация</button></div>
+            <div class="tabs">
+              <button class="tab active" data-tab="login">Вход</button>
+              <button class="tab" data-tab="reg">Регистрация</button>
+            </div>
             <form id="auth-form">
               <input type="email" id="email-in" placeholder="Email" class="input" required>
               <input type="password" id="pass-in" placeholder="Пароль" class="input" required>
@@ -151,73 +153,106 @@
             </form>
           </div>
         </div>
-        <div id="profile-acts" style="display:none"><button id="logout-btn" class="btn btn--danger full">Выйти из аккаунта</button></div>
+        <div id="profile-acts" style="display:none">
+          <button id="logout-btn" class="btn btn--danger full">Выйти</button>
+        </div>
       </div>
     </section>
 
     <section id="admin" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
-        <h1>Админ-панель</h1>
+        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
+        <h1>Админка</h1>
         <div class="admin-stats">
           <div class="stat-box"><span id="st-orders">0</span><small>Заказов</small></div>
           <div class="stat-box"><span id="st-rev">0 ₽</span><small>Выручка</small></div>
         </div>
         <div class="admin-card">
           <h3>Добавить товар</h3>
-          <input type="text" id="add-name" placeholder="Название модели" class="input">
-          <input type="number" id="add-price" placeholder="Цена (₽)" class="input">
-          <select id="add-cat" class="input"><option value="designer">Дизайнерские</option><option value="kids">Детские</option><option value="swag">Сваг</option><option value="classics">Классика</option><option value="sale">Распродажа</option></select>
-          <input type="text" id="add-sizes" placeholder="Размеры (39,40,41)" class="input">
-          <input type="text" id="add-img" placeholder="Ссылка на фото (или загрузите ниже)" class="input">
+          <input type="text" id="add-name" placeholder="Название" class="input">
+          <input type="number" id="add-price" placeholder="Цена" class="input">
+          <select id="add-cat" class="input">
+            <option value="designer">Дизайнерские</option>
+            <option value="kids">Детские</option>
+            <option value="swag">Сваг</option>
+            <option value="classics">Классика</option>
+            <option value="sale">Распродажа</option>
+          </select>
+          <input type="text" id="add-sizes" placeholder="39,40,41" class="input">
+          <input type="text" id="add-img" placeholder="Ссылка на фото" class="input">
           <label class="file-upload">
             <input type="file" id="add-file" accept="image/*" hidden>
             <span>📁 Выбрать с устройства</span>
           </label>
           <img id="img-preview" alt="Превью">
-          <textarea id="add-desc" placeholder="Описание, материалы, особенности" class="input"></textarea>
-          <button class="btn btn--primary full" onclick="window.addProd()">Опубликовать</button>
+          <textarea id="add-desc" placeholder="Описание" class="input" style="height:50px"></textarea>
+          <button class="btn btn--primary full" onclick="window.addProd()">💾 Опубликовать</button>
         </div>
-        <div class="admin-card"><h3>Управление заказами</h3><div id="admin-orders-list"></div></div>
-        <div class="admin-card"><h3>Список товаров</h3><div id="admin-prods"></div></div>
+        <div class="admin-card">
+          <h3>Управление заказами</h3>
+          <div id="admin-orders-list"></div>
+        </div>
+        <div class="admin-card">
+          <h3>Список товаров</h3>
+          <div id="admin-prods"></div>
+        </div>
       </div>
     </section>
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-item active" onclick="window.go('home')"><i class="fa-solid fa-house"></i><span>Главная</span></button>
-    <button class="nav-item" onclick="window.go('catalog')"><i class="fa-solid fa-store"></i><span>Каталог</span></button>
-    <button class="nav-item" onclick="window.go('cart')"><i class="fa-solid fa-bag-shopping"></i><span>Корзина</span></button>
-    <button class="nav-item" onclick="window.go('profile')"><i class="fa-regular fa-user"></i><span>Профиль</span></button>
+    <button class="nav-item active" onclick="window.go('home')">
+      <i class="fa-solid fa-house"></i>
+      <span>Главная</span>
+    </button>
+    <button class="nav-item" onclick="window.go('catalog')">
+      <i class="fa-solid fa-store"></i>
+      <span>Каталог</span>
+    </button>
+    <button class="nav-item" onclick="window.go('cart')">
+      <i class="fa-solid fa-bag-shopping"></i>
+      <span>Корзина</span>
+    </button>
+    <button class="nav-item" onclick="window.go('profile')">
+      <i class="fa-regular fa-user"></i>
+      <span>Профиль</span>
+    </button>
   </nav>
 
-  <div id="chat-modal" class="modal">
-    <div class="modal-content chat-modal">
-      <div class="modal-header"><span>Поддержка</span><button onclick="window.closeChat()"><i class="fa-solid fa-xmark"></i></button></div>
+  <!-- MODALS -->
+  <div id="chat-modal" class="modal" onclick="if(event.target===this)window.closeChat()">
+    <div class="modal-content">
+      <div class="modal-header"><span>Поддержка</span><button onclick="window.closeChat()">✕</button></div>
       <div id="chat-body"></div>
       <div class="chat-input">
-        <input id="chat-in" placeholder="Напишите сообщение...">
-        <button onclick="window.sendMsg()"><i class="fa-solid fa-paper-plane"></i></button>
+        <input id="chat-in" placeholder="Вопрос...">
+        <button onclick="window.sendMsg()">→</button>
       </div>
     </div>
   </div>
 
-  <div id="pvz-modal" class="modal">
+  <div id="pvz-modal" class="modal" onclick="if(event.target===this)window.closePVZ()">
     <div class="modal-content">
       <h3>Адрес доставки</h3>
       <input id="pvz-city" placeholder="Город" class="input">
-      <input id="pvz-addr" placeholder="Улица, дом, пункт выдачи" class="input">
-      <div class="modal-actions"><button onclick="window.savePVZ()" class="btn btn--primary">Сохранить</button><button onclick="window.closePVZ()" class="btn btn--ghost">Отмена</button></div>
+      <input id="pvz-addr" placeholder="Улица, дом, ПВЗ" class="input">
+      <div class="modal-actions">
+        <button onclick="window.savePVZ()" class="btn btn--primary">Сохранить</button>
+        <button onclick="window.closePVZ()" class="btn btn--outline">Отмена</button>
+      </div>
     </div>
   </div>
 
-  <div id="profile-edit-modal" class="modal">
+  <div id="profile-edit-modal" class="modal" onclick="if(event.target===this)window.closeProfileEdit()">
     <div class="modal-content">
       <h3>Редактировать профиль</h3>
       <input type="text" id="edit-fullname" placeholder="Имя" class="input">
       <input type="tel" id="edit-phone" placeholder="Телефон" class="input">
       <input type="url" id="edit-avatar" placeholder="Ссылка на аватар" class="input">
-      <div class="modal-actions"><button onclick="window.saveProfile()" class="btn btn--primary">Сохранить</button><button onclick="window.closeProfileEdit()" class="btn btn--ghost">Отмена</button></div>
+      <div class="modal-actions">
+        <button onclick="window.saveProfile()" class="btn btn--primary">Сохранить</button>
+        <button onclick="window.closeProfileEdit()" class="btn btn--outline">Отмена</button>
+      </div>
     </div>
   </div>
 
