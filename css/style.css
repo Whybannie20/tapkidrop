@@ -50,3 +50,37 @@ body{font-family:-apple-system,sans-serif;background:var(--bg);color:var(--text)
 @media(prefers-color-scheme:dark){:root{--bg:#121212;--card:#1e1e1e;--text:#f8f9fa;--muted:#adb5bd;--border:#333}.card{box-shadow:0 2px 8px rgba(0,0,0,0.3)}input,textarea,select{background:#2d2d2d;border-color:#444;color:#fff}}
 button:focus,.card:focus,input:focus,select:focus,textarea:focus{outline:2px solid var(--primary);outline-offset:2px}
 button:focus:not(:focus-visible),.card:focus:not(:focus-visible){outline:none}
+/* === МАРКЕТПЛЕЙС FIX + UI UPGRADE === */
+.profile-header { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 0; }
+.container > .menu-grid { gap: 10px; margin-top: 20px; }
+.container > #auth-flow, .container > #profile-acts { margin-top: 20px; }
+
+/* Табы входа/регистрации */
+.auth-card { box-shadow: var(--shadow); border-radius: var(--radius); padding: 20px; background: var(--card); }
+.tabs { display: flex; background: #f2f2f7; border-radius: 10px; padding: 4px; margin-bottom: 16px; }
+.tab { flex: 1; padding: 10px; border-radius: 8px; border: none; background: transparent; font-weight: 500; cursor: pointer; transition: all 0.2s; color: var(--muted); }
+.tab.active { background: #fff; color: var(--primary); box-shadow: 0 2px 6px rgba(0,0,0,0.08); font-weight: 600; }
+
+/* Кнопки и инпуты */
+.input { padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 10px; background: #fafafa; transition: all 0.2s; font-size: 0.95rem; }
+.input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(0,91,255,0.1); outline: none; }
+.btn--primary { padding: 12px; border-radius: 10px; font-size: 0.95rem; transition: transform 0.1s, box-shadow 0.2s; box-shadow: 0 2px 8px rgba(0,91,255,0.2); }
+.btn--primary:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(0,91,255,0.3); }
+.btn--primary:active:not(:disabled) { transform: scale(0.98); }
+.btn--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Корзина: выравнивание */
+.cart-item { align-items: center; padding: 16px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.cart-controls { display: flex; align-items: center; gap: 8px; background: #f2f2f7; padding: 4px 6px; border-radius: 8px; }
+.cart-controls button { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 1rem; border: none; background: #fff; border-radius: 6px; cursor: pointer; transition: 0.15s; }
+.cart-controls button:active { transform: scale(0.9); }
+.cart-item > div:first-child { max-width: 70%; }
+
+/* Карточки товаров: ховер */
+.card { transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(0,0,0,0.03); }
+.card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+.card-img img { transition: transform 0.3s; }
+.card:hover .card-img img { transform: scale(1.05); }
+
+/* Модалки: центровка */
+#pvz-modal > div { box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
