@@ -203,3 +203,110 @@ h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800; line-height: 1.1; 
   .modal-content { max-height: 90vh; border-radius: 20px 20px 0 0; align-self: flex-end; }
 }
 @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+/* === 📱 PREMIUM BOTTOM NAVIGATION === */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 76px;
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 8px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 9000;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.06);
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 18px;
+  transition: all 0.25s var(--ease-out-expo);
+  min-width: 72px;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-item i {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  transition: transform 0.25s var(--ease-out-expo), color 0.25s, filter 0.2s;
+}
+
+.nav-item span {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.25s var(--ease-out-expo);
+}
+
+.nav-item:hover {
+  background: var(--surface-hover);
+}
+
+.nav-item:active {
+  transform: scale(0.9);
+}
+
+/* ✅ Active State */
+.nav-item.active i {
+  color: var(--accent);
+  transform: translateY(-2px) scale(1.15);
+  filter: drop-shadow(0 4px 8px var(--accent-glow));
+}
+
+.nav-item.active span {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 🔹 Active Indicator */
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--accent);
+  opacity: 0.9;
+}
+
+/* 🛒 Badge on Cart (optional sync) */
+.nav-item .nav-badge {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 99px;
+  min-width: 15px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  animation: pop-in 0.3s var(--ease-out-expo);
+}
+
+@media (max-width: 480px) {
+  .bottom-nav { height: 72px; }
+  .nav-item i { font-size: 1.3rem; }
+  .nav-item span { font-size: 0.72rem; }
+}
