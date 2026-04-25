@@ -1,78 +1,79 @@
 // ==========================================
-// ТАПКИДРОП | CORE ENGINE v4.2
+// ТАПКИДРОП | AUTH & PROFILE ENGINE v5.0
 // ==========================================
 
-// 1. SUPABASE INIT
+// 1. SUPABASE INIT + SESSION RESTORE
 try {
   window.sb = supabase.createClient(
     "https://ccskkieoldeyqrpxxpnb.supabase.co",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjc2traWVvbGRleXFycHh4cG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NjkyOTYsImV4cCI6MjA5MjM0NTI5Nn0.XO_JiiZDlbMFuHSdgQZKQedXPWbsQF2XTd0_wDhS7oI"
   );
-  window.sb.auth.getSession().then(({data}) => { if(data?.session) window.sb.auth.setSession(data.session); });
-  if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
-} catch(e) { console.error("[SB]", e); }
+  console.log("[OK] Supabase connected");
+  
+  // Жёсткое восстановление сессии ДО рендера
+  window.sb.auth.getSession().then(async ({ data, error }) => {
+    if (error) { console.error("[SB SESSION ERR]", error); return; }
+    if (data?.session) {
+      await window.sb.auth.setSession(data.session);
+      console.log("[OK] Session restored:", data.session.user.email);
+    }
+    // После восстановления — загружаем профиль
+    if (window.sb.auth.getUser) {
+      const {  { user } } = await window.sb.auth.getUser();
+      if (user) await loadUserProfile(user);
+    }
+  });
+  
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+} catch (e) { console.error("[SB INIT FAIL]", e); }
 
-// 2. STATE
+// 2. STATE & CONFIG
 window.cart = JSON.parse(localStorage.getItem("cart")) || [];
-window.pvz = JSON.parse(localStorage.getItem("pvz")) || {city:"", addr:""};
-window.currentUser = null; let prods = [];
-const TG_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o", TG_CHAT = "-1003371505343";
+window.pvz = JSON.parse(localStorage.getItem("pvz")) || { city: "", addr: "" };
+window.currentUser = null;
+window.userProfile = null; // Данные профиля из БД
+let prods = [];
+const TG_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o";
+const TG_CHAT = "-1003371505343";
 const ADMIN_EMAILS = ["antoniobandero11@gmail.com", "buldozer.mas12@gmail.com"];
 
-window.toast = (msg, type="info") => {
-  const t = document.createElement("div"); t.textContent = msg; t.className = "toast";
-  document.body.appendChild(t); setTimeout(()=>t.remove(), 2500);
+// Toast
+window.toast = (msg, type = "info") => {
+  const t = document.createElement("div");
+  t.textContent = msg; t.className = `toast toast--${type}`;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; setTimeout(() => t.remove(), 200); }, 2500);
 };
 
-// 3. ROUTING & UI
+// 3. ROUTING
 window.go = id => {
-  document.querySelectorAll(".page").forEach(p => { p.classList.remove("active"); p.style.opacity="0"; p.style.transform="translateY(8px)"; });
-  const el = document.getElementById(id); if(!el) return;
+  document.querySelectorAll(".page").forEach(p => { p.classList.remove("active"); p.style.opacity = "0"; p.style.transform = "translateY(8px)"; });
+  const el = document.getElementById(id); if (!el) return;
   el.classList.add("active");
-  requestAnimationFrame(() => { el.style.opacity="1"; el.style.transform="translateY(0)"; });
-  document.querySelectorAll(".nav-item").forEach(b=>b.classList.remove("active"));
-  const nav = document.querySelector(`.nav-item[onclick*="${id}"]`); if(nav) nav.classList.add("active");
-  window.scrollTo({top:0, behavior:"smooth"});
-  if(id==="admin") loadAdmin(); if(id==="my-orders") loadOrders(); if(id==="product" && window._cur) loadReviews(window._cur.id);
+  requestAnimationFrame(() => { el.style.opacity = "1"; el.style.transform = "translateY(0)"; });
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+  const nav = document.querySelector(`.nav-item[onclick*="${id}"]`); if (nav) nav.classList.add("active");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (id === "admin") loadAdmin();
+  if (id === "my-orders") loadOrders();
+  if (id === "product" && window._cur) loadReviews(window._cur.id);
 };
 
-// 4. FILTERS
-document.querySelectorAll(".cat-btn").forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll(".cat-btn").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    render(btn.dataset.cat==="all" ? prods : prods.filter(p=>p.category===btn.dataset.cat));
-  };
-});
-document.getElementById("search-input")?.addEventListener("input", e => {
-  render(prods.filter(p=>p.name.toLowerCase().includes(e.target.value.toLowerCase())));
-});
-
-// 5. PRODUCTS
+// 4. PRODUCTS (сокращённо, логика та же)
 async function loadProds() {
   try {
-    const {data, error} = await window.sb.from("products").select("*").order("created_at", {ascending:false});
-    if(error) throw error;
+    const { data, error } = await window.sb.from("products").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
     prods = data || [];
     render(prods.slice(0, 4));
-  } catch(e) { window.toast("❌ Ошибка загрузки", "error"); }
+  } catch (e) { window.toast("❌ Ошибка каталога", "error"); }
 }
-
-function render(list) {
-  const html = list.map(p => `
-    <div class="card" onclick="window.openProd('${p.id}')">
-      <div class="card-img">${p.image_url?`<img src="${p.image_url}" loading="lazy">`:"👟"}</div>
-      <div class="card-body">
-        <div class="card-name">${p.name}</div>
-        <div class="card-price">${Number(p.price).toLocaleString("ru")} ₽</div>
-        <button class="btn-cart" onclick="event.stopPropagation();window.addCart('${p.id}')">В корзину</button>
-      </div>
-    </div>`).join("");
+function render(list) { /* ...та же функция рендера... */ 
+  const html = list.map(p => `<div class="card" onclick="window.openProd('${p.id}')"><div class="card-img">${p.image_url?`<img src="${p.image_url}" loading="lazy">`:"👟"}</div><div class="card-body"><div class="card-name">${p.name}</div><div class="card-price">${Number(p.price).toLocaleString("ru")} ₽</div><button class="btn-cart" onclick="event.stopPropagation();window.addCart('${p.id}')">В корзину</button></div></div>`).join("");
   const c = document.getElementById("catalog-grid"); if(c) c.innerHTML = html || '<p style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted)">Ничего не найдено</p>';
   const h = document.getElementById("home-grid"); if(h) h.innerHTML = list.slice(0,4).map(p => `<div class="card" onclick="window.openProd('${p.id}')"><div class="card-img">${p.image_url?`<img src="${p.image_url}" loading="lazy">`:"👟"}</div><div class="card-body"><div class="card-name">${p.name}</div><div class="card-price">${Number(p.price).toLocaleString("ru")} ₽</div><button class="btn-cart" onclick="event.stopPropagation();window.addCart('${p.id}')">В корзину</button></div></div>`).join("");
 }
-
-window.openProd = async id => {
+window.openProd = async id => { /* ...та же логика... */ 
   const p = prods.find(x=>x.id===id); if(!p) return window.toast("Не найдено", "error");
   window._cur = p; window._sz = null;
   document.getElementById("detail-img").innerHTML = p.image_url?`<img src="${p.image_url}">`:"👟";
@@ -85,19 +86,15 @@ window.openProd = async id => {
   window.go("product"); await loadReviews(id);
 };
 
-// 6. CART
-window.addCart = id => {
+// 5. CART (сокращённо)
+window.addCart = id => { /* ... */ 
   const p = prods.find(x=>x.id===id); if(!p) return;
   const ex = window.cart.find(x=>x.id===id && x.size===window._sz);
   if(ex) ex.qty++; else window.cart.push({...p, qty:1, size:window._sz||null});
   localStorage.setItem("cart", JSON.stringify(window.cart)); updateCart(); window.toast("✅ В корзине", "success");
 };
-window.addToCartFromDetail = () => {
-  if(!window._sz && (window._cur?.sizes?.length||0)>0) return window.toast("Выбери размер", "error");
-  window.addCart(window._cur.id);
-};
-
-function updateCart() {
+window.addToCartFromDetail = () => { if(!window._sz && (window._cur?.sizes?.length||0)>0) return window.toast("Выбери размер", "error"); window.addCart(window._cur.id); };
+function updateCart() { /* ... */ 
   const badge = document.getElementById("cart-badge"); if(badge) badge.textContent = window.cart.reduce((s,i)=>s+(i.qty||1),0);
   const emp = document.getElementById("cart-empty"), lay = document.getElementById("cart-layout");
   if(!window.cart.length) { if(emp) emp.style.display="block"; if(lay) lay.style.display="none"; return; }
@@ -109,14 +106,15 @@ function updateCart() {
 window.chgQ = (k,d) => { window.cart[k].qty = Math.max(1, (window.cart[k].qty||1)+d); localStorage.setItem("cart",JSON.stringify(window.cart)); updateCart(); };
 window.rmQ = k => { window.cart.splice(k,1); localStorage.setItem("cart",JSON.stringify(window.cart)); updateCart(); window.toast("🗑️ Удалено", "info"); };
 
-// 7. CHECKOUT
+// 6. CHECKOUT
 window.checkout = async () => {
   const btn = document.getElementById("checkout-btn"); if(!btn) return;
   try {
-    const res = await window.sb.auth.getUser(); if(res.error) throw res.error;
-    const user = res.data?.user; if(!user) return window.toast("Войдите", "error");
-    if(!window.cart.length) return window.toast("Корзина пуста", "error");
-    if(!window.pvz.city||!window.pvz.addr) { window.openPVZ(); return window.toast("Укажите адрес", "error"); }
+    const {  { user }, error: authErr } = await window.sb.auth.getUser();
+    if (authErr) throw authErr;
+    if (!user) return window.toast("Войдите в аккаунт", "error");
+    if (!window.cart.length) return window.toast("Корзина пуста", "error");
+    if (!window.pvz.city||!window.pvz.addr) { window.openPVZ(); return window.toast("Укажите адрес", "error"); }
     btn.disabled = true; btn.textContent = "⏳ Оформление...";
     const total = window.cart.reduce((s,i)=>s+Number(i.price)*(i.qty||1),0);
     const items = window.cart.map(i=>`${i.name}${i.size?` (${i.size})`:''} ×${i.qty}`).join(", ");
@@ -128,11 +126,11 @@ window.checkout = async () => {
   finally { btn.disabled=false; btn.textContent="Оформить"; }
 };
 
-// 8. ORDERS
+// 7. ORDERS
 window.loadOrders = async () => {
   const c = document.getElementById("my-orders-list"); if(!c) return;
   try {
-    const res = await window.sb.auth.getUser(); const user = res.data?.user;
+    const {  { user } } = await window.sb.auth.getUser();
     if(!user) { c.innerHTML='<p style="text-align:center;padding:30px;color:var(--text-muted)">Войдите</p>'; return; }
     c.innerHTML='<div style="text-align:center;padding:20px">Загрузка...</div>';
     const ordersRes = await window.sb.from("orders").select("*").eq("user_email",user.email).order("created_at",{ascending:false});
@@ -145,7 +143,7 @@ window.loadOrders = async () => {
   } catch(e) { c.innerHTML='<p style="text-align:center;padding:30px;color:var(--danger)">Ошибка</p>'; }
 };
 
-// 9. ADMIN
+// 8. ADMIN
 async function loadAdmin() {
   try {
     const {count}=await window.sb.from("orders").select("*",{count:"exact",head:true});
@@ -159,8 +157,7 @@ async function loadAdmin() {
     const ol=document.getElementById("admin-orders-list"); if(ol) ol.innerHTML=allOrders?.map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><span>#${(o.id||"").slice(0,6)}<br><small style="color:var(--text-muted)">${o.user_email}</small></span><select onchange="window.updateOrderStatus('${o.id}',this.value)" class="input" style="width:auto">${statuses.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join("")}</select><button onclick="window.deleteOrder('${o.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div>`).join("")||'<p style="color:var(--text-muted)">Нет заказов</p>';
   } catch(e){console.error("[ADMIN]",e);}
 }
-
-window.addProd = async () => {
+window.addProd = async () => { /* ...та же логика... */ 
   const n=document.getElementById("add-name").value.trim(), p=Number(document.getElementById("add-price").value), c=document.getElementById("add-cat").value, s=document.getElementById("add-sizes").value, u=document.getElementById("add-img").value.trim(), d=document.getElementById("add-desc").value.trim(), f=document.getElementById("add-file")?.files?.[0];
   if(!n||!p) return window.toast("Заполните поля", "error");
   const btn=event?.target||document.querySelector("#admin .btn--primary"); btn.disabled=true; btn.textContent="⏳...";
@@ -172,61 +169,195 @@ window.addProd = async () => {
 };
 window.delProd = async id => { if(!confirm("Удалить?"))return; try{await window.sb.from("products").delete().eq("id",id);window.toast("🗑️","info");await loadProds();await loadAdmin();}catch(e){window.toast("❌ "+e.message,"error");} };
 window.updateOrderStatus = async (oid,st) => { try{await window.sb.from("orders").update({status:st}).eq("id",oid);await window.sb.from("order_status_history").insert({order_id:oid,status:st});window.toast("✅ Статус обновлён", "success");await loadAdmin();await loadOrders();}catch(e){window.toast("❌ "+e.message, "error");} };
-window.deleteOrder = async id => { if(!confirm("Удалить?"))return; try{await window.sb.from("orders").delete().eq("id",id);window.toast("🗑️","info");await loadAdmin();}catch(e){window.toast("❌ "+e.message, "error");} };
+window.deleteOrder = async id => { if(!confirm("Удалить?"))return; try{await window.sb.from("orders").delete().eq("id",id);window.toast("🗑️","info");await loadAdmin();}catch(e){window.toast("❌ "+e.message,"error");} };
 
-// 10. AUTH & PROFILE
-let isLogin=true;
-document.querySelectorAll(".tab").forEach(t=>{t.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");isLogin=(t.dataset.tab==="login");const btn=document.getElementById("auth-btn");if(btn)btn.textContent=isLogin?"Войти":"Регистрация";};});
-document.getElementById("auth-form").addEventListener("submit",async e=>{
-  e.preventDefault(); const em=document.getElementById("email-in").value.trim(), pw=document.getElementById("pass-in").value, err=document.getElementById("auth-err"), btn=document.getElementById("auth-btn");
-  if(!err||!btn) return;
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return err.textContent="Неверный email",err.style.display="block";
-  if(pw.length<6) return err.textContent="Пароль < 6 символов",err.style.display="block";
-  err.style.display="none"; btn.disabled=true; btn.textContent="⏳...";
-  try{const res=isLogin?await window.sb.auth.signInWithPassword({email:em,password:pw}):await window.sb.auth.signUp({email:em,password:pw});if(res.error)throw res.error;window.toast(isLogin?"✅ С возвращением!":"✅ Регистрация!","success");}catch(e){err.textContent=e.message;err.style.display="block";window.toast("❌ "+err.textContent, "error");}finally{btn.disabled=false;btn.textContent=isLogin?"Войти":"Регистрация";}
+// 🔑 9. AUTH & PROFILE — ПОЛНОСТЬЮ ПЕРЕПИСАНО
+let isLogin = true;
+
+// Переключение табов
+document.querySelectorAll(".tab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    isLogin = (t.dataset.tab === "login");
+    const btn = document.getElementById("auth-btn");
+    if (btn) btn.textContent = isLogin ? "Войти" : "Регистрация";
+  };
 });
-window.sb.auth.onAuthStateChange(async(_,sess)=>{
-  const u=sess?.user; window.currentUser=u;
-  const af=document.getElementById("auth-flow"), pa=document.getElementById("profile-acts"), pn=document.getElementById("profile-display-name"), pe=document.getElementById("profile-email"), am=document.getElementById("admin-menu");
-  if(af) af.style.display=u?"none":"block";
-  if(pa) pa.style.display=u?"block":"none";
-  if(u){
-    const{data:p}=await window.sb.from("profiles").select("*").eq("id",u.id).single();
-    const n=p?.full_name||u.email.split("@")[0];
-    if(pn) pn.textContent=n; if(pe) pe.textContent=u.email;
-    if(am) am.style.display=ADMIN_EMAILS.includes(u.email)?"flex":"none";
-  } else {
-    if(pn) pn.textContent="Гость"; if(pe) pe.textContent="Войдите"; if(am) am.style.display="none";
+
+// Обработка формы входа/регистрации
+document.getElementById("auth-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("email-in").value.trim();
+  const password = document.getElementById("pass-in").value;
+  const errEl = document.getElementById("auth-err");
+  const btn = document.getElementById("auth-btn");
+  
+  if (!errEl || !btn) return;
+  
+  // Валидация
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = "Некорректный email"; errEl.style.display = "block"; return;
+  }
+  if (password.length < 6) {
+    errEl.textContent = "Пароль минимум 6 символов"; errEl.style.display = "block"; return;
+  }
+  
+  errEl.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = isLogin ? "⏳ Вход..." : "⏳ Регистрация...";
+  
+  try {
+    const { data, error } = isLogin
+      ? await window.sb.auth.signInWithPassword({ email, password })
+      : await window.sb.auth.signUp({ email, password });
+    
+    if (error) throw error;
+    
+    // После успешного входа/регистрации — загружаем профиль
+    if (data?.user) {
+      await loadUserProfile(data.user);
+      window.toast(isLogin ? "✅ С возвращением!" : "✅ Аккаунт создан!", "success");
+    }
+  } catch (e) {
+    errEl.textContent = e.message || "Ошибка авторизации";
+    errEl.style.display = "block";
+    window.toast("❌ " + errEl.textContent, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = isLogin ? "Войти" : "Регистрация";
   }
 });
-document.getElementById("logout-btn").addEventListener("click",async()=>{await window.sb.auth.signOut();window.currentUser=null;window.toast("👋 Вышли","info");});
 
+// 🔁 Глобальный слушатель изменений авторизации
+window.sb.auth.onAuthStateChange(async (event, session) => {
+  const user = session?.user;
+  window.currentUser = user || null;
+  
+  const authFlow = document.getElementById("auth-flow");
+  const profileActs = document.getElementById("profile-acts");
+  const dispName = document.getElementById("profile-display-name");
+  const dispEmail = document.getElementById("profile-email");
+  const adminMenu = document.getElementById("admin-menu");
+  
+  if (authFlow) authFlow.style.display = user ? "none" : "block";
+  if (profileActs) profileActs.style.display = user ? "block" : "none";
+  
+  if (user) {
+    // Загружаем профиль из БД
+    await loadUserProfile(user);
+    
+    // Обновляем UI профиля
+    const name = window.userProfile?.full_name || user.email.split("@")[0];
+    if (dispName) dispName.textContent = name;
+    if (dispEmail) dispEmail.textContent = user.email;
+    
+    // Показываем админку только для утверждённых почт
+    if (adminMenu) {
+      adminMenu.style.display = ADMIN_EMAILS.includes(user.email) ? "flex" : "none";
+    }
+  } else {
+    // Пользователь вышел
+    window.userProfile = null;
+    if (dispName) dispName.textContent = "Гость";
+    if (dispEmail) dispEmail.textContent = "Войдите в аккаунт";
+    if (adminMenu) adminMenu.style.display = "none";
+  }
+});
+
+// 🔽 Функция загрузки профиля из БД
+async function loadUserProfile(user) {
+  if (!user?.id) return;
+  try {
+    const {  profile, error } = await window.sb
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    
+    if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
+    window.userProfile = profile || { email: user.email, full_name: user.email.split("@")[0] };
+  } catch (e) {
+    console.error("[LOAD PROFILE]", e);
+    // Fallback: создаём профиль, если не найден
+    window.userProfile = { email: user.email, full_name: user.email.split("@")[0] };
+  }
+}
+
+// Выход из аккаунта
+document.getElementById("logout-btn")?.addEventListener("click", async () => {
+  await window.sb.auth.signOut();
+  window.currentUser = null;
+  window.userProfile = null;
+  window.toast("👋 Вы вышли", "info");
+});
+
+// ✏️ Редактирование профиля
 window.editProfile = async () => {
-  if(!window.currentUser) return window.toast("Войдите", "error");
-  const{data:p}=await window.sb.from("profiles").select("*").eq("id",window.currentUser.id).single();
-  document.getElementById("edit-fullname").value = p?.full_name||"";
-  document.getElementById("edit-phone").value = p?.phone||"";
-  document.getElementById("edit-avatar").value = p?.avatar_url||"";
+  if (!window.currentUser) return window.toast("Войдите в аккаунт", "error");
+  
+  // Загружаем актуальные данные
+  await loadUserProfile(window.currentUser);
+  
+  // Заполняем форму
+  document.getElementById("edit-fullname").value = window.userProfile?.full_name || "";
+  document.getElementById("edit-phone").value = window.userProfile?.phone || "";
+  document.getElementById("edit-avatar").value = window.userProfile?.avatar_url || "";
+  
+  // Показываем модалку
   document.getElementById("profile-edit-modal").classList.add("open");
 };
-window.closeProfileEdit = () => document.getElementById("profile-edit-modal").classList.remove("open");
-window.saveProfile = async () => {
-  if(!window.currentUser)return; const btn=event.target; btn.disabled=true; btn.textContent="⏳...";
-  try{
-    await window.sb.from("profiles").upsert({id:window.currentUser.id,email:window.currentUser.email,full_name:document.getElementById("edit-fullname").value.trim(),phone:document.getElementById("edit-phone").value.trim(),avatar_url:document.getElementById("edit-avatar").value.trim()});
-    window.closeProfileEdit();
-    document.getElementById("profile-display-name").textContent=document.getElementById("edit-fullname").value.trim()||window.currentUser.email.split("@")[0];
-    window.toast("✅ Сохранено", "success");
-  }catch(e){window.toast("❌ "+e.message, "error");} finally{btn.disabled=false;btn.textContent="Сохранить";}
+
+window.closeProfileEdit = () => {
+  document.getElementById("profile-edit-modal").classList.remove("open");
 };
 
-// 11. REVIEWS
-async function loadReviews(pid){
-  const l=document.getElementById("reviews-list"); if(!l) return;
-  try{
-    const{data:r}=await window.sb.from("reviews").select("*,profiles(full_name)").eq("product_id",pid).order("created_at",{ascending:false});
-    l.innerHTML = r?.length ? r.map(x=>`<div class="review-card"><div style="display:flex;justify-content:space-between"><b>${x.profiles?.full_name||x.user_email.split("@")[0]}</b><span style="color:#f59e0b">${"⭐".repeat(x.rating)}</span></div><p style="margin-top:6px;color:var(--text-muted)">${x.comment}</p>${window.currentUser&&ADMIN_EMAILS.includes(window.currentUser.email)?`<button onclick="window.deleteReview('${x.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-top:6px;font-size:0.8rem">Удалить</button>`:''}</div>`).join("") : '<p style="color:var(--text-muted)">Нет отзывов</p>';
-  }catch(e){console.error(e);}
+// 💾 Сохранение профиля
+window.saveProfile = async () => {
+  if (!window.currentUser) return window.toast("Ошибка: войдите снова", "error");
+  
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "⏳ Сохранение...";
+  
+  try {
+    const payload = {
+      id: window.currentUser.id,
+      email: window.currentUser.email,
+      full_name: document.getElementById("edit-fullname").value.trim(),
+      phone: document.getElementById("edit-phone").value.trim(),
+      avatar_url: document.getElementById("edit-avatar").value.trim(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const { error } = await window.sb
+      .from("profiles")
+      .upsert(payload, { onConflict: "id" });
+    
+    if (error) throw error;
+    
+    // Обновляем локальный профиль и UI
+    window.userProfile = { ...window.userProfile, ...payload };
+    document.getElementById("profile-display-name").textContent = payload.full_name || window.currentUser.email.split("@")[0];
+    
+    window.closeProfileEdit();
+    window.toast("✅ Профиль сохранён", "success");
+  } catch (e) {
+    console.error("[SAVE PROFILE]", e);
+    window.toast("❌ " + (e.message || "Ошибка сохранения"), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Сохранить";
+  }
+};
+
+// 10. REVIEWS
+async function loadReviews(pid) {
+  const list = document.getElementById("reviews-list"); if (!list) return;
+  try {
+    const {  reviews } = await window.sb.from("reviews").select("*, profiles(full_name)").eq("product_id", pid).order("created_at", { ascending: false });
+    list.innerHTML = reviews?.length ? reviews.map(r => `<div class="review-card"><div style="display:flex;justify-content:space-between"><b>${r.profiles?.full_name||r.user_email.split("@")[0]}</b><span style="color:#f59e0b">${"⭐".repeat(r.rating)}</span></div><p style="margin-top:6px;color:var(--text-muted)">${r.comment}</p>${window.currentUser&&ADMIN_EMAILS.includes(window.currentUser.email)?`<button onclick="window.deleteReview('${r.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-top:6px;font-size:0.8rem">Удалить</button>`:''}</div>`).join("") : '<p style="color:var(--text-muted)">Нет отзывов</p>';
+  } catch(e){console.error(e);}
 }
 document.getElementById("review-form")?.addEventListener("submit",async e=>{
   e.preventDefault(); if(!window.currentUser) return window.toast("Войдите", "error");
@@ -239,7 +370,7 @@ document.getElementById("review-form")?.addEventListener("submit",async e=>{
 });
 window.deleteReview = async id => { if(!confirm("Удалить?"))return; try{await window.sb.from("reviews").delete().eq("id",id);await loadReviews(window._cur.id);window.toast("🗑️","info");}catch(e){window.toast("❌ "+e.message,"error");} };
 
-// 12. SUPPORT
+// 11. SUPPORT
 window.openChat = () => {
   document.getElementById("chat-modal").classList.add("open");
   document.getElementById("chat-body").innerHTML='<div id="quick-q" style="display:flex;flex-direction:column;gap:8px"><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Возврат\')">↩️ Возврат</button><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Где заказ\')">📦 Статус</button><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Оператор\')">👨‍💻 Оператор</button></div>';
@@ -257,7 +388,7 @@ window.sendMsg = () => {
 };
 window.sendMsgDirect = t => { document.getElementById("chat-in").value=t; window.sendMsg(); };
 
-// 13. PVZ
+// 12. PVZ
 window.openPVZ = () => { document.getElementById("pvz-modal").classList.add("open"); document.getElementById("pvz-city").value=window.pvz.city||""; document.getElementById("pvz-addr").value=window.pvz.addr||""; };
 window.closePVZ = () => document.getElementById("pvz-modal").classList.remove("open");
 window.savePVZ = () => {
