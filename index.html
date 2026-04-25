@@ -162,15 +162,22 @@
     <section id="admin" class="page">
       <div class="container">
         <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
-        <h1>Админка</h1>
-        <div class="admin-stats">
+        <h1>Админ-панель</h1>
+        
+        <!-- 🔹 СТАТИСТИКА -->
+        <div class="admin-stats" id="admin-stats-grid">
           <div class="stat-box"><span id="st-orders">0</span><small>Заказов</small></div>
           <div class="stat-box"><span id="st-rev">0 ₽</span><small>Выручка</small></div>
+          <div class="stat-box"><span id="st-prods">0</span><small>Товаров</small></div>
+          <div class="stat-box"><span id="st-reviews">0</span><small>Отзывов</small></div>
         </div>
+
+        <!-- 🔹 ДОБАВЛЕНИЕ / РЕДАКТИРОВАНИЕ -->
         <div class="admin-card">
-          <h3>Добавить товар</h3>
-          <input type="text" id="add-name" placeholder="Название" class="input">
-          <input type="number" id="add-price" placeholder="Цена" class="input">
+          <h3 id="form-title">➕ Добавить товар</h3>
+          <input type="hidden" id="edit-prod-id">
+          <input type="text" id="add-name" placeholder="Название модели" class="input">
+          <input type="number" id="add-price" placeholder="Цена (₽)" class="input">
           <select id="add-cat" class="input">
             <option value="designer">Дизайнерские</option>
             <option value="kids">Детские</option>
@@ -178,28 +185,33 @@
             <option value="classics">Классика</option>
             <option value="sale">Распродажа</option>
           </select>
-          <input type="text" id="add-sizes" placeholder="39,40,41" class="input">
-          <input type="text" id="add-img" placeholder="Ссылка на фото" class="input">
+          <input type="text" id="add-sizes" placeholder="Размеры (через запятую: 39,40,41)" class="input">
+          <input type="text" id="add-img" placeholder="Или вставь ссылку на фото" class="input">
           <label class="file-upload">
             <input type="file" id="add-file" accept="image/*" hidden>
             <span>📁 Выбрать с устройства</span>
           </label>
           <img id="img-preview" alt="Превью">
-          <textarea id="add-desc" placeholder="Описание" class="input" style="height:50px"></textarea>
-          <button class="btn btn--primary full" onclick="window.addProd()">💾 Опубликовать</button>
+          <textarea id="add-desc" placeholder="Описание, материалы, особенности" class="input" style="height:60px"></textarea>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn btn--primary full" id="prod-action-btn" onclick="window.handleProdAction()">💾 Опубликовать</button>
+            <button class="btn btn--outline" id="prod-cancel-btn" onclick="window.cancelEdit()" style="display:none;width:30%">Отмена</button>
+          </div>
         </div>
+
+        <!-- 🔹 УПРАВЛЕНИЕ ЗАКАЗАМИ -->
         <div class="admin-card">
-          <h3>Управление заказами</h3>
-          <div id="admin-orders-list"></div>
+          <h3>📦 Заказы</h3>
+          <div id="admin-orders-list" style="max-height:250px;overflow-y:auto"></div>
         </div>
+
+        <!-- 🔹 СПИСОК ТОВАРОВ -->
         <div class="admin-card">
-          <h3>Список товаров</h3>
-          <div id="admin-prods"></div>
+          <h3>📋 Каталог</h3>
+          <div id="admin-prods" style="max-height:300px;overflow-y:auto"></div>
         </div>
       </div>
     </section>
-  </main>
-
   <nav class="bottom-nav">
     <button class="nav-item active" onclick="window.go('home')">
       <i class="fa-solid fa-house"></i>
