@@ -2,13 +2,13 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ТапкиДроп</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ТапкиДроп | Маркетплейс кроссовок</title>
   <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Оригинальные кроссовки и дизайнерская обувь с доставкой по РФ">
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="ТапкиДроп">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
@@ -17,14 +17,8 @@
   <header class="app-header">
     <div class="header-inner">
       <div class="logo" onclick="window.go('home')">ТАПКИДРОП</div>
-      <div class="search-wrap">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="search-input" placeholder="Поиск...">
-      </div>
-      <button class="cart-btn" onclick="window.go('cart')">
-        <i class="fa-solid fa-bag-shopping"></i>
-        <span id="cart-badge">0</span>
-      </button>
+      <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="search-input" placeholder="Поиск кроссовок..."></div>
+      <button class="cart-btn" onclick="window.go('cart')"><i class="fa-solid fa-bag-shopping"></i><span id="cart-badge">0</span></button>
     </div>
   </header>
 
@@ -38,35 +32,31 @@
       <button class="cat-btn" data-cat="sale">Распродажа</button>
     </div>
   </nav>
+
   <main class="app-main">
     <section id="home" class="page active">
       <div class="container">
         <div class="promo-banner">
           <div class="promo-text">
-            <span class="promo-tag">DROP 2026</span>
+            <span class="promo-tag">🔥 DROP 2026</span>
             <h1>Стиль без компромиссов</h1>
-            <button class="btn btn--primary" onclick="window.go('catalog')">В каталог</button>
+            <p>Лимитированные коллаборации, премиум-материалы, быстрая доставка.</p>
+            <button class="btn btn--primary" onclick="window.go('catalog')">Смотреть каталог</button>
           </div>
           <div class="promo-img">👟</div>
         </div>
-        <div class="section-header"><h2>В тренде</h2></div>
+        <div class="section-header"><h2>В тренде</h2><div class="section-line"></div></div>
         <div class="grid" id="home-grid"></div>
       </div>
     </section>
 
-    <section id="catalog" class="page">
-      <div class="container">
-        <div class="grid" id="catalog-grid"></div>
-      </div>
-    </section>
+    <section id="catalog" class="page"><div class="container"><div class="grid" id="catalog-grid"></div></div></section>
 
     <section id="product" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.go('catalog')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
+        <button class="back-btn" onclick="window.go('catalog')"><i class="fa-solid fa-arrow-left"></i> Каталог</button>
         <div class="product-detail">
-          <div class="product-media">
-            <div class="main-img" id="detail-img">👟</div>
-          </div>
+          <div class="product-media"><div class="main-img" id="detail-img">👟</div></div>
           <div class="product-info">
             <div class="brand" id="detail-brand">БРЕНД</div>
             <h1 id="detail-name">Название</h1>
@@ -77,21 +67,12 @@
           </div>
         </div>
         <div class="reviews-section">
-          <h3>Отзывы</h3>
+          <h3>Отзывы покупателей</h3>
           <div id="reviews-list"></div>
-          <form id="review-form">
-            <div class="rating-select">
-              <span>Оценка:</span>
-              <select id="review-rating" class="input">
-                <option value="5">⭐⭐⭐⭐⭐</option>
-                <option value="4">⭐⭐⭐⭐</option>
-                <option value="3">⭐⭐⭐</option>
-                <option value="2">⭐⭐</option>
-                <option value="1">⭐</option>
-              </select>
-            </div>
-            <textarea id="review-comment" placeholder="Ваш отзыв..." class="input" required></textarea>
-            <button type="submit" class="btn btn--primary" style="align-self: flex-start">Оставить отзыв</button>
+          <form id="review-form" class="review-form">
+            <div class="rating-select"><span>Ваша оценка:</span><select id="review-rating" class="input"><option value="5">⭐⭐⭐⭐⭐</option><option value="4">⭐⭐⭐⭐</option><option value="3">⭐⭐⭐</option><option value="2">⭐⭐</option><option value="1">⭐</option></select></div>
+            <textarea id="review-comment" placeholder="Расскажите о модели..." class="input" required></textarea>
+            <button type="submit" class="btn btn--primary" style="align-self: flex-start; margin-top: 8px">Оставить отзыв</button>
           </form>
         </div>
       </div>
@@ -102,15 +83,16 @@
         <h1>Корзина</h1>
         <div id="cart-empty" class="empty-state" style="display:none">
           <div class="empty-icon">🛒</div>
-          <p>Корзина пуста</p>
-          <button class="btn btn--primary" onclick="window.go('catalog')">В каталог</button>
+          <p>Корзина пока пуста</p>
+          <button class="btn btn--outline" onclick="window.go('catalog')">Перейти в каталог</button>
         </div>
         <div id="cart-layout" style="display:none">
           <div id="cart-items"></div>
           <div class="cart-summary">
             <div class="summary-row"><span>Доставка</span><span class="free">Бесплатно</span></div>
-            <div class="summary-row total"><span>Итого</span><span id="cart-total">0 ₽</span></div>
-            <button class="btn btn--primary full" id="checkout-btn" onclick="window.checkout()">Оформить</button>
+            <div class="summary-row total"><span>Итого к оплате</span><span id="cart-total">0 ₽</span></div>
+            <label class="agree-check"><input type="checkbox" id="agree-check"><span>Принимаю <a href="#" onclick="window.openModal('offer')">оферту</a> и <a href="#" onclick="window.openModal('privacy')">политику конфиденциальности</a></span></label>
+            <button class="btn btn--primary full" id="checkout-btn" onclick="window.checkout()">Оформить заказ</button>
           </div>
         </div>
       </div>
@@ -118,7 +100,7 @@
 
     <section id="my-orders" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
+        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
         <h1>Мои заказы</h1>
         <div id="my-orders-list"></div>
       </div>
@@ -126,70 +108,54 @@
 
     <section id="profile" class="page">
       <div class="profile-header">
-        <div class="avatar-wrap">👤</div>
+        <div class="avatar-wrap"><i class="fa-regular fa-user"></i></div>
         <h2 id="profile-display-name">Гость</h2>
         <p id="profile-email">Войдите в аккаунт</p>
       </div>
-      <div class="container">
-        <div class="menu-grid">
+      <div class="container profile-container">
+        <div id="profile-menu" class="menu-grid">
           <div class="menu-item" onclick="window.go('my-orders')"><i class="fa-solid fa-bag-shopping"></i><span>Мои заказы</span><i class="fa-solid fa-chevron-right"></i></div>
           <div class="menu-item" onclick="window.editProfile()"><i class="fa-solid fa-user-pen"></i><span>Редактировать профиль</span><i class="fa-solid fa-chevron-right"></i></div>
-          <div class="menu-item" id="admin-menu" style="display:none" onclick="window.go('admin')"><i class="fa-solid fa-gear"></i><span>Админка</span><i class="fa-solid fa-chevron-right"></i></div>
+          <div class="menu-item" id="admin-menu" style="display:none" onclick="window.go('admin')"><i class="fa-solid fa-gear"></i><span>Админ-панель</span><i class="fa-solid fa-chevron-right"></i></div>
           <div class="menu-item" onclick="window.openPVZ()"><i class="fa-solid fa-location-dot"></i><span>Адрес доставки</span><i class="fa-solid fa-chevron-right"></i></div>
           <div class="menu-item" onclick="window.openChat()"><i class="fa-solid fa-headset"></i><span>Поддержка</span><i class="fa-solid fa-chevron-right"></i></div>
         </div>
-        <div id="auth-flow" class="auth-flow">
-          <div class="auth-card">
-            <div class="tabs">
-              <button class="tab active" data-tab="login">Вход</button>
-              <button class="tab" data-tab="reg">Регистрация</button>
+        <div id="auth-section">
+          <div id="auth-flow" class="auth-flow">
+            <div class="auth-card">
+              <div class="tabs"><button class="tab active" data-tab="login">Вход</button><button class="tab" data-tab="reg">Регистрация</button></div>
+              <form id="auth-form">
+                <input type="email" id="email-in" placeholder="Email" class="input" required>
+                <input type="password" id="pass-in" placeholder="Пароль (мин. 6 символов)" class="input" required>
+                <div id="auth-err" class="error" style="display:none"></div>
+                <button type="submit" class="btn btn--primary full" id="auth-btn">Войти</button>
+              </form>
             </div>
-            <form id="auth-form">
-              <input type="email" id="email-in" placeholder="Email" class="input" required>
-              <input type="password" id="pass-in" placeholder="Пароль" class="input" required>
-              <div id="auth-err" class="error" style="display:none"></div>
-              <button type="submit" class="btn btn--primary full" id="auth-btn">Войти</button>
-            </form>
           </div>
-        </div>
-        <div id="profile-acts" style="display:none">
-          <button id="logout-btn" class="btn btn--danger full">Выйти</button>
+          <div id="profile-acts" style="display:none"><button id="logout-btn" class="btn btn--danger full">Выйти из аккаунта</button></div>
         </div>
       </div>
     </section>
 
     <section id="admin" class="page">
       <div class="container">
-        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Назад</button>
+        <button class="back-btn" onclick="window.go('profile')"><i class="fa-solid fa-arrow-left"></i> Профиль</button>
         <h1>Админ-панель</h1>
-        
-        <!-- 🔹 СТАТИСТИКА -->
         <div class="admin-stats" id="admin-stats-grid">
           <div class="stat-box"><span id="st-orders">0</span><small>Заказов</small></div>
           <div class="stat-box"><span id="st-rev">0 ₽</span><small>Выручка</small></div>
           <div class="stat-box"><span id="st-prods">0</span><small>Товаров</small></div>
           <div class="stat-box"><span id="st-reviews">0</span><small>Отзывов</small></div>
         </div>
-
-        <!-- 🔹 ДОБАВЛЕНИЕ / РЕДАКТИРОВАНИЕ -->
         <div class="admin-card">
           <h3 id="form-title">➕ Добавить товар</h3>
           <input type="hidden" id="edit-prod-id">
           <input type="text" id="add-name" placeholder="Название модели" class="input">
           <input type="number" id="add-price" placeholder="Цена (₽)" class="input">
-          <select id="add-cat" class="input">
-            <option value="designer">Дизайнерские</option>
-            <option value="kids">Детские</option>
-            <option value="swag">Сваг</option>
-            <option value="classics">Классика</option>
-            <option value="sale">Распродажа</option>
-          </select>
-          <input type="text" id="add-sizes" placeholder="Размеры (через запятую: 39,40,41)" class="input">
-          <input type="text" id="add-img" placeholder="Или вставь ссылку на фото" class="input">
-          <label class="file-upload">
-            <input type="file" id="add-file" accept="image/*" hidden>
-            <span>📁 Выбрать с устройства</span>
-          </label>
+          <select id="add-cat" class="input"><option value="designer">Дизайнерские</option><option value="kids">Детские</option><option value="swag">Сваг</option><option value="classics">Классика</option><option value="sale">Распродажа</option></select>
+          <input type="text" id="add-sizes" placeholder="Размеры (через запятую)" class="input">
+          <input type="text" id="add-img" placeholder="Или ссылка на фото" class="input">
+          <label class="file-upload"><input type="file" id="add-file" accept="image/*" hidden><span>📁 Выбрать с устройства</span></label>
           <img id="img-preview" alt="Превью">
           <textarea id="add-desc" placeholder="Описание, материалы, особенности" class="input" style="height:60px"></textarea>
           <div style="display:flex;gap:10px;margin-top:8px">
@@ -197,75 +163,37 @@
             <button class="btn btn--outline" id="prod-cancel-btn" onclick="window.cancelEdit()" style="display:none;width:30%">Отмена</button>
           </div>
         </div>
-
-        <!-- 🔹 УПРАВЛЕНИЕ ЗАКАЗАМИ -->
-        <div class="admin-card">
-          <h3>📦 Заказы</h3>
-          <div id="admin-orders-list" style="max-height:250px;overflow-y:auto"></div>
-        </div>
-
-        <!-- 🔹 СПИСОК ТОВАРОВ -->
-        <div class="admin-card">
-          <h3>📋 Каталог</h3>
-          <div id="admin-prods" style="max-height:300px;overflow-y:auto"></div>
-        </div>
+        <div class="admin-card"><h3>📦 Заказы</h3><div id="admin-orders-list" style="max-height:250px;overflow-y:auto"></div></div>
+        <div class="admin-card"><h3>📋 Каталог</h3><div id="admin-prods" style="max-height:300px;overflow-y:auto"></div></div>
       </div>
     </section>
+  </main>
+
   <nav class="bottom-nav">
-    <button class="nav-item active" onclick="window.go('home')">
-      <i class="fa-solid fa-house"></i>
-      <span>Главная</span>
-    </button>
-    <button class="nav-item" onclick="window.go('catalog')">
-      <i class="fa-solid fa-store"></i>
-      <span>Каталог</span>
-    </button>
-    <button class="nav-item" onclick="window.go('cart')">
-      <i class="fa-solid fa-bag-shopping"></i>
-      <span>Корзина</span>
-    </button>
-    <button class="nav-item" onclick="window.go('profile')">
-      <i class="fa-regular fa-user"></i>
-      <span>Профиль</span>
-    </button>
+    <button class="nav-item active" onclick="window.go('home')"><i class="fa-solid fa-house"></i><span>Главная</span></button>
+    <button class="nav-item" onclick="window.go('catalog')"><i class="fa-solid fa-store"></i><span>Каталог</span></button>
+    <button class="nav-item" onclick="window.go('cart')"><i class="fa-solid fa-bag-shopping"></i><span>Корзина</span></button>
+    <button class="nav-item" onclick="window.go('profile')"><i class="fa-regular fa-user"></i><span>Профиль</span></button>
   </nav>
 
   <!-- MODALS -->
   <div id="chat-modal" class="modal" onclick="if(event.target===this)window.closeChat()">
-    <div class="modal-content">
-      <div class="modal-header"><span>Поддержка</span><button onclick="window.closeChat()">✕</button></div>
-      <div id="chat-body"></div>
-      <div class="chat-input">
-        <input id="chat-in" placeholder="Вопрос...">
-        <button onclick="window.sendMsg()">→</button>
-      </div>
-    </div>
+    <div class="modal-content"><div class="modal-header"><span>💬 Поддержка</span><button onclick="window.closeChat()"><i class="fa-solid fa-xmark"></i></button></div><div id="chat-body"></div><div class="chat-input"><input id="chat-in" placeholder="Ваш вопрос..."><button onclick="window.sendMsg()"><i class="fa-solid fa-paper-plane"></i></button></div></div>
   </div>
 
   <div id="pvz-modal" class="modal" onclick="if(event.target===this)window.closePVZ()">
-    <div class="modal-content">
-      <h3>Адрес доставки</h3>
-      <input id="pvz-city" placeholder="Город" class="input">
-      <input id="pvz-addr" placeholder="Улица, дом, ПВЗ" class="input">
-      <div class="modal-actions">
-        <button onclick="window.savePVZ()" class="btn btn--primary">Сохранить</button>
-        <button onclick="window.closePVZ()" class="btn btn--outline">Отмена</button>
-      </div>
-    </div>
+    <div class="modal-content"><h3>📍 Адрес доставки</h3><input id="pvz-city" placeholder="Город" class="input"><input id="pvz-addr" placeholder="Улица, дом, пункт выдачи" class="input"><div class="modal-actions"><button onclick="window.savePVZ()" class="btn btn--primary">Сохранить</button><button onclick="window.closePVZ()" class="btn btn--ghost">Отмена</button></div></div>
   </div>
 
   <div id="profile-edit-modal" class="modal" onclick="if(event.target===this)window.closeProfileEdit()">
-    <div class="modal-content">
-      <h3>Редактировать профиль</h3>
-      <input type="text" id="edit-fullname" placeholder="Имя" class="input">
-      <input type="tel" id="edit-phone" placeholder="Телефон" class="input">
-      <input type="url" id="edit-avatar" placeholder="Ссылка на аватар" class="input">
-      <div class="modal-actions">
-        <button onclick="window.saveProfile()" class="btn btn--primary">Сохранить</button>
-        <button onclick="window.closeProfileEdit()" class="btn btn--outline">Отмена</button>
-      </div>
-    </div>
+    <div class="modal-content"><h3>✏️ Редактировать профиль</h3><input type="text" id="edit-fullname" placeholder="Имя и фамилия" class="input"><input type="tel" id="edit-phone" placeholder="Телефон" class="input"><input type="url" id="edit-avatar" placeholder="Ссылка на аватар" class="input"><div class="modal-actions"><button onclick="window.saveProfile()" class="btn btn--primary">Сохранить</button><button onclick="window.closeProfileEdit()" class="btn btn--ghost">Отмена</button></div></div>
   </div>
+
+  <div id="legal-modal" class="modal" onclick="if(event.target===this)window.closeModal('legal')">
+    <div class="modal-content legal-scroll"><div class="modal-header"><span id="legal-title">Документ</span><button onclick="window.closeModal('legal')"><i class="fa-solid fa-xmark"></i></button></div><div id="legal-body"></div></div>
+  </div>
+
+  <footer class="app-footer"><a href="#" onclick="window.openModal('offer')">Публичная оферта</a><a href="#" onclick="window.openModal('privacy')">Конфиденциальность</a><a href="#" onclick="window.go('catalog')">Каталог</a><span>© 2026 ТапкиДроп</span></footer>
 
   <script src="js/app.js"></script>
 </body>

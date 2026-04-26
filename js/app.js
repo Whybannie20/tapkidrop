@@ -1,24 +1,18 @@
 // ==========================================
-// ТАПКИДРОП | STABLE CORE v6.2
+// ТАПКИДРОП | STABLE CORE v7.0 (AUDIT FIX)
 // ==========================================
 
 // 1. SUPABASE INIT
 try {
-  window.sb = supabase.createClient(
-    "https://ccskkieoldeyqrpxxpnb.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjc2traWVvbGRleXFycHh4cG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NjkyOTYsImV4cCI6MjA5MjM0NTI5Nn0.XO_JiiZDlbMFuHSdgQZKQedXPWbsQF2XTd0_wDhS7oI"
-  );
-  window.sb.auth.getSession().then(({data, error}) => {
-    if(!error && data?.session) window.sb.auth.setSession(data.session);
-  });
+  window.sb = supabase.createClient("https://ccskkieoldeyqrpxxpnb.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjc2traWVvbGRleXFycHh4cG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NjkyOTYsImV4cCI6MjA5MjM0NTI5Nn0.XO_JiiZDlbMFuHSdgQZKQedXPWbsQF2XTd0_wDhS7oI");
+  window.sb.auth.getSession().then(({data, error}) => { if(!error && data?.session) window.sb.auth.setSession(data.session); });
   if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 } catch(e) { console.error("[SB]", e); }
 
-// 2. STATE
+// 2. STATE & UTILS
 window.cart = JSON.parse(localStorage.getItem("cart")) || [];
 window.pvz = JSON.parse(localStorage.getItem("pvz")) || {city:"", addr:""};
-window.currentUser = null; window.userProfile = null;
-window._editProdId = null;
+window.currentUser = null; window.userProfile = null; window._editProdId = null;
 let prods = [];
 const TG_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o", TG_CHAT = "-1003371505343";
 const ADMIN_EMAILS = ["antoniobandero11@gmail.com", "buldozer.mas12@gmail.com"];
@@ -29,38 +23,35 @@ window.toast = (msg, type="info") => {
   document.body.appendChild(t); setTimeout(()=>{t.style.opacity="0";setTimeout(()=>t.remove(),200);},2500);
 };
 
-// 3. NAV & UI CONTROL
+// 3. NAV & ROUTING
 window.go = function(id) {
   document.querySelectorAll(".page").forEach(p=>{p.classList.remove("active");p.style.opacity="0";p.style.transform="translateY(8px)";});
   const el = document.getElementById(id); if(el){el.classList.add("active");requestAnimationFrame(()=>{el.style.opacity="1";el.style.transform="translateY(0)";});}
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.remove("active"));
   const nav = document.querySelector(`.nav-item[onclick*="${id}"]`); if(nav) nav.classList.add("active");
   
-  // ✅ Скрываем категории только на нужных страницах
-  const catNav = document.getElementById("cat-nav"); if(catNav) catNav.classList.toggle("hide", id !== "home" && id !== "catalog");
+  // ✅ Категории видны ТОЛЬКО на главной и в каталоге
+  const catNav = document.getElementById("cat-nav"); if(catNav) catNav.classList.toggle("hide", !["home","catalog"].includes(id));
   
   window.scrollTo({top:0, behavior:"smooth"});
   if(id==="admin") loadAdmin(); if(id==="my-orders") loadOrders(); if(id==="product" && window._cur) loadReviews(window._cur.id);
 };
 
+// Debounce search
+let searchTimer;
+document.getElementById("search-input")?.addEventListener("input", e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => render(prods.filter(p=>p.name.toLowerCase().includes(e.target.value.toLowerCase()))), 250);
+});
 document.querySelectorAll(".cat-btn").forEach(btn=>{btn.onclick=()=>{document.querySelectorAll(".cat-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");render(btn.dataset.cat==="all"?prods:prods.filter(p=>p.category===btn.dataset.cat));};});
-document.getElementById("search-input")?.addEventListener("input", e=>{render(prods.filter(p=>p.name.toLowerCase().includes(e.target.value.toLowerCase())));});
 
-// 4. PRODUCTS & RENDER
-async function loadProds() {
-  try {
-    const res = await window.sb.from("products").select("*").order("created_at", {ascending:false});
-    if(res.error) throw res.error;
-    prods = res.data || []; render(prods.slice(0,4));
-  } catch(e) { console.error("[LOAD]",e); }
-}
-
+// 4. PRODUCTS
+async function loadProds() { try { const res=await window.sb.from("products").select("*").order("created_at",{ascending:false}); if(res.error) throw res.error; prods=res.data||[]; render(prods.slice(0,4)); } catch(e){window.toast("❌ Ошибка каталога","error");} }
 function render(list) {
-  const html = list.map(p=>`<div class="card" onclick="window.openProd('${p.id}')"><div class="card-img">${p.image_url?`<img src="${p.image_url}" loading="lazy">`:"👟"}</div><div class="card-body"><div class="card-name">${p.name}</div><div class="card-price">${Number(p.price).toLocaleString("ru")} ₽</div><button class="btn-cart" onclick="event.stopPropagation();window.addCart('${p.id}')">В корзину</button></div></div>`).join("");
+  const html=list.map(p=>`<div class="card" onclick="window.openProd('${p.id}')"><div class="card-img">${p.image_url?`<img src="${p.image_url}" loading="lazy">`:"👟"}</div><div class="card-body"><div class="card-name">${p.name}</div><div class="card-price">${Number(p.price).toLocaleString("ru")} ₽</div><button class="btn-cart" onclick="event.stopPropagation();window.addCart('${p.id}')">В корзину</button></div></div>`).join("");
   const c=document.getElementById("catalog-grid"); if(c) c.innerHTML=html||'<p style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted)">Ничего не найдено</p>';
   const h=document.getElementById("home-grid"); if(h) h.innerHTML=list.slice(0,4).map(p=>`<div class="card" onclick="window.openProd('${p.id}')"><div class="card-img">${p.image_url?`<img src="${p.image_url}" loading="lazy">`:"👟"}</div><div class="card-body"><div class="card-name">${p.name}</div><div class="card-price">${Number(p.price).toLocaleString("ru")} ₽</div><button class="btn-cart" onclick="event.stopPropagation();window.addCart('${p.id}')">В корзину</button></div></div>`).join("");
 }
-
 window.openProd = async id => {
   const p=prods.find(x=>x.id===id); if(!p) return window.toast("Не найдено","error");
   window._cur=p; window._sz=null;
@@ -88,25 +79,27 @@ function updateCart() {
 window.chgQ=(k,d)=>{window.cart[k].qty=Math.max(1,(window.cart[k].qty||1)+d);localStorage.setItem("cart",JSON.stringify(window.cart));updateCart();};
 window.rmQ=k=>{window.cart.splice(k,1);localStorage.setItem("cart",JSON.stringify(window.cart));updateCart();window.toast("🗑️ Удалено","info");};
 
-// 6. CHECKOUT
+// 6. CHECKOUT + OFFER MODAL
 window.checkout = async () => {
   const btn = document.getElementById("checkout-btn"); if (!btn) return;
   try {
     const agree = document.getElementById("agree-check");
-    if (!agree?.checked) return window.toast("Примите условия оферты и политики", "error");
-    
+    if (!agree?.checked) return window.toast("✅ Примите условия оферты перед оплатой", "error");
     const res = await window.sb.auth.getUser(); if(res.error) throw res.error;
-    const user = res.data?.user; if(!user) return window.toast("Войдите","error");
+    const user = res.data?.user; if(!user) return window.toast("Войдите в аккаунт","error");
     if(!window.cart.length) return window.toast("Корзина пуста","error");
     if(!window.pvz.city||!window.pvz.addr){window.openPVZ();return window.toast("Укажите адрес","error");}
-    btn.disabled=true; btn.textContent="⏳ Оформление...";
     
+    btn.disabled=true; btn.textContent="⏳ Создание заказа...";
     const total=window.cart.reduce((s,i)=>s+Number(i.price)*(i.qty||1),0); const items=window.cart.map(i=>`${i.name}${i.size?` (${i.size})`:''} ×${i.qty}`).join(", ");
     const or=await window.sb.from("orders").insert({user_email:user.email,items,total:total.toLocaleString("ru")+" ₽",address:`${window.pvz.city}, ${window.pvz.addr}`,status:"pending"}).select().single();
     if(or.error) throw or.error;
+    
+    // Telegram
     fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:TG_CHAT,text:`📦 ЗАКАЗ #${or.data.id.slice(0,6)}\n👤 ${or.data.user_email}\n🛍️ ${or.data.items}\n💰 ${or.data.total}`})}).catch(()=>{});
-    window.cart=[]; localStorage.setItem("cart","[]"); updateCart(); window.toast("✅ Оформлен!","success"); setTimeout(()=>window.go("my-orders"),600);
-  } catch(e){console.error(e);window.toast("❌ "+e.message,"error");} finally{btn.disabled=false;btn.textContent="Оформить";}
+    
+    window.cart=[]; localStorage.setItem("cart","[]"); updateCart(); window.toast("✅ Заказ оформлен!","success"); setTimeout(()=>window.go("my-orders"),600);
+  } catch(e){console.error(e);window.toast("❌ "+e.message,"error");} finally{btn.disabled=false;btn.textContent="Оформить заказ";}
 };
 
 // 7. ORDERS
@@ -130,16 +123,16 @@ async function loadAdmin() {
     const {data:ordData}=await window.sb.from("orders").select("total");
     const rev=ordData?.reduce((s,o)=>s+(parseFloat(String(o.total).replace(/[^0-9.]/g,""))||0),0)||0;
     
-    const elOrd=document.getElementById("st-orders"); if(elOrd) elOrd.textContent=ordCnt||0;
-    const elProd=document.getElementById("st-prods"); if(elProd) elProd.textContent=prodCnt||0;
-    const elRev=document.getElementById("st-reviews"); if(elRev) elRev.textContent=revCnt||0;
-    const elRevSum=document.getElementById("st-rev"); if(elRevSum) elRevSum.textContent=rev.toLocaleString("ru")+" ₽";
+    const s1=document.getElementById("st-orders"); if(s1) s1.textContent=ordCnt||0;
+    const s2=document.getElementById("st-prods"); if(s2) s2.textContent=prodCnt||0;
+    const s3=document.getElementById("st-reviews"); if(s3) s3.textContent=revCnt||0;
+    const s4=document.getElementById("st-rev"); if(s4) s4.textContent=rev.toLocaleString("ru")+" ₽";
 
     const {data:allOrders}=await window.sb.from("orders").select("*").order("created_at",{ascending:false}).limit(50);
     const statuses=["pending","paid","processing","shipped","delivered","cancelled"];
-    const ol=document.getElementById("admin-orders-list"); if(ol) ol.innerHTML=allOrders?.map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><span>#${(o.id||"").slice(0,6)}<br><small style="color:var(--text-muted)">${o.user_email}</small></span><select onchange="window.updateOrderStatus('${o.id}',this.value)" class="input" style="width:auto">${statuses.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join("")}</select><button onclick="window.deleteOrder('${o.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div>`).join("")||'<p style="color:var(--text-muted)">Нет заказов</p>';
+    const ol=document.getElementById("admin-orders-list"); if(ol) ol.innerHTML=allOrders?.map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><span>#${(o.id||"").slice(0,6)}<br><small style="color:var(--text-muted)">${o.user_email}</small></span><select onchange="window.updateOrderStatus('${o.id}',this.value)" class="input" style="width:auto;margin:0">${statuses.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join("")}</select><button onclick="window.deleteOrder('${o.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div>`).join("")||'<p style="color:var(--text-muted)">Нет заказов</p>';
 
-    const ap=document.getElementById("admin-prods"); if(ap) ap.innerHTML=prods.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;overflow:hidden"><img src="${p.image_url||''}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px">${p.name}</span></div><div style="display:flex;gap:6px"><button onclick="window.editProd('${p.id}')" style="background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.8rem">✏️</button><button onclick="window.delProd('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div></div>`).join("")||'<p style="color:var(--text-muted)">Нет товаров</p>';
+    const ap=document.getElementById("admin-prods"); if(ap) ap.innerHTML=prods.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;overflow:hidden"><img src="${p.image_url||''}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px">${p.name}</span></div><div style="display:flex;gap:6px"><button onclick="window.editProd('${p.id}')" style="background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.8rem">✏️</button><button onclick="window.delProd('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div></div>`).join("")||'<p style="color:var(--text-muted)">Нет товаров</p>';
   } catch(e){console.error("[ADMIN]",e);}
 }
 
@@ -153,34 +146,22 @@ window.editProd = id => {
   document.getElementById("add-img").value = p.image_url||"";
   document.getElementById("add-desc").value = p.description||"";
   const pv=document.getElementById("img-preview"); if(p.image_url){pv.src=p.image_url;pv.style.display="block";}else{pv.style.display="none";}
-  document.getElementById("form-title").textContent = "✏️ Редактирование товара";
-  document.getElementById("prod-action-btn").textContent = "💾 Сохранить изменения";
+  document.getElementById("form-title").textContent = "✏️ Редактирование";
+  document.getElementById("prod-action-btn").textContent = "💾 Сохранить";
   document.getElementById("prod-cancel-btn").style.display = "block";
   window.go("admin");
 };
-window.cancelEdit = () => {
-  window._editProdId = null;
-  document.getElementById("add-name").value=""; document.getElementById("add-price").value="";
-  document.getElementById("add-img").value=""; document.getElementById("add-desc").value="";
-  document.getElementById("add-sizes").value="";
-  document.getElementById("add-file").value="";
-  document.getElementById("img-preview").style.display="none";
-  document.getElementById("form-title").textContent="➕ Добавить товар";
-  document.getElementById("prod-action-btn").textContent="💾 Опубликовать";
-  document.getElementById("prod-cancel-btn").style.display="none";
-};
+window.cancelEdit = () => { window._editProdId=null; ["add-name","add-price","add-img","add-desc","add-sizes"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""}); document.getElementById("add-file").value=""; document.getElementById("img-preview").style.display="none"; document.getElementById("form-title").textContent="➕ Добавить товар"; document.getElementById("prod-action-btn").textContent="💾 Опубликовать"; document.getElementById("prod-cancel-btn").style.display="none"; };
 window.handleProdAction = async () => {
   const n=document.getElementById("add-name")?.value.trim(), p=Number(document.getElementById("add-price")?.value), c=document.getElementById("add-cat")?.value, s=document.getElementById("add-sizes")?.value, u=document.getElementById("add-img")?.value.trim(), d=document.getElementById("add-desc")?.value.trim(), f=document.getElementById("add-file")?.files?.[0];
   if(!n||!p) return window.toast("Заполните название и цену","error");
   const btn=document.getElementById("prod-action-btn"); btn.disabled=true; btn.textContent="⏳...";
   try {
-    let url=u;
-    if(f){const fn=`${Date.now()}_${f.name.replace(/[^a-z0-9.]/gi,"_")}`;await window.sb.storage.from("products").upload(fn,f,{upsert:true});const{data}=window.sb.storage.from("products").getPublicUrl(fn);url=data?.publicUrl||"";}
+    let url=u; if(f){const fn=`${Date.now()}_${f.name.replace(/[^a-z0-9.]/gi,"_")}`;await window.sb.storage.from("products").upload(fn,f,{upsert:true});const{data}=window.sb.storage.from("products").getPublicUrl(fn);url=data?.publicUrl||"";}
     const payload={name:n,price:p,category:c,sizes:s.split(",").map(x=>x.trim()).filter(Boolean),image_url:url,description:d};
-    if(window._editProdId) { const{error}=await window.sb.from("products").update(payload).eq("id",window._editProdId); if(error) throw error; }
-    else { const{error}=await window.sb.from("products").insert(payload); if(error) throw error; }
+    if(window._editProdId) { const{error}=await window.sb.from("products").update(payload).eq("id",window._editProdId); if(error) throw error; } else { const{error}=await window.sb.from("products").insert(payload); if(error) throw error; }
     window.toast("✅ "+(window._editProdId?"Обновлено":"Опубликовано"),"success"); window.cancelEdit(); await loadProds(); await loadAdmin();
-  } catch(e){window.toast("❌ "+e.message,"error");} finally{btn.disabled=false;btn.textContent=window._editProdId?"Сохранить изменения":"Опубликовать";}
+  } catch(e){window.toast("❌ "+e.message,"error");} finally{btn.disabled=false;btn.textContent=window._editProdId?"Сохранить":"Опубликовать";}
 };
 window.delProd=async id=>{if(!confirm("Удалить?"))return;try{await window.sb.from("products").delete().eq("id",id);window.toast("🗑️","info");await loadProds();await loadAdmin();}catch(e){window.toast("❌ "+e.message,"error");}};
 window.updateOrderStatus=async(oid,st)=>{try{await window.sb.from("orders").update({status:st}).eq("id",oid);await window.sb.from("order_status_history").insert({order_id:oid,status:st});window.toast("✅ Статус обновлён","success");await loadAdmin();await loadOrders();}catch(e){window.toast("❌ "+e.message,"error");}};
@@ -193,23 +174,22 @@ document.getElementById("auth-form")?.addEventListener("submit",async e=>{
   e.preventDefault(); const em=document.getElementById("email-in")?.value.trim(), pw=document.getElementById("pass-in")?.value, err=document.getElementById("auth-err"), btn=document.getElementById("auth-btn");
   if(!err||!btn) return; if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return err.textContent="Неверный email",err.style.display="block"; if(pw.length<6) return err.textContent="Пароль < 6 символов",err.style.display="block";
   err.style.display="none"; btn.disabled=true; btn.textContent="⏳...";
-  try{const res=isLogin?await window.sb.auth.signInWithPassword({email:em,password:pw}):await window.sb.auth.signUp({email:em,password:pw});if(res.error)throw res.error;if(res.data?.user){await loadUserProfile(res.data.user);window.toast(isLogin?"✅ С возвращением!":"✅ Регистрация!","success");}}catch(e){err.textContent=e.message;err.style.display="block";window.toast("❌ "+err.textContent,"error");}finally{btn.disabled=false;btn.textContent=isLogin?"Войти":"Регистрация";}
+  try{const res=isLogin?await window.sb.auth.signInWithPassword({email:em,password:pw}):await window.sb.auth.signUp({email:em,password:pw});if(res.error)throw res.error;if(res.data?.user){await loadUserProfile(res.data.user);window.toast(isLogin?"✅ С возвращением!":"✅ Аккаунт создан!","success");}}catch(e){err.textContent=e.message;err.style.display="block";window.toast("❌ "+err.textContent,"error");}finally{btn.disabled=false;btn.textContent=isLogin?"Войти":"Регистрация";}
 });
 window.sb.auth.onAuthStateChange(async function(_,session){
   const user=session?.user; window.currentUser=user||null;
   const af=document.getElementById("auth-flow"),pa=document.getElementById("profile-acts"),pn=document.getElementById("profile-display-name"),pe=document.getElementById("profile-email"),am=document.getElementById("admin-menu");
-  if(af) af.style.display=user?"none":"block";
-  if(pa) pa.style.display=user?"block":"none";
+  if(af) af.style.display=user?"none":"block"; if(pa) pa.style.display=user?"block":"none";
   if(user){await loadUserProfile(user);const n=window.userProfile?.full_name||user.email.split("@")[0];if(pn)pn.textContent=n;if(pe)pe.textContent=user.email;if(am)am.style.display=ADMIN_EMAILS.includes(user.email)?"flex":"none";}
   else{window.userProfile=null;if(pn)pn.textContent="Гость";if(pe)pe.textContent="Войдите";if(am)am.style.display="none";}
 });
 async function loadUserProfile(user){if(!user?.id)return;try{const res=await window.sb.from("profiles").select("*").eq("id",user.id).single();if(res.error&&res.error.code!=="PGRST116")throw res.error;window.userProfile=res.data||{email:user.email,full_name:user.email.split("@")[0]};}catch(e){window.userProfile={email:user.email,full_name:user.email.split("@")[0]};}}
-document.getElementById("logout-btn")?.addEventListener("click",async function(){await window.sb.auth.signOut();window.currentUser=null;window.userProfile=null;window.toast("👋 Вышли","info");});
+document.getElementById("logout-btn")?.addEventListener("click",async function(){await window.sb.auth.signOut();window.currentUser=null;window.userProfile=null;window.toast("👋 Вы вышли","info");});
 window.editProfile=async function(){if(!window.currentUser)return window.toast("Войдите","error");await loadUserProfile(window.currentUser);const ef=document.getElementById("edit-fullname"),ep=document.getElementById("edit-phone"),ea=document.getElementById("edit-avatar");if(ef)ef.value=window.userProfile?.full_name||"";if(ep)ep.value=window.userProfile?.phone||"";if(ea)ea.value=window.userProfile?.avatar_url||"";document.getElementById("profile-edit-modal").classList.add("open");};
 window.closeProfileEdit=()=>document.getElementById("profile-edit-modal").classList.remove("open");
 window.saveProfile=async function(){if(!window.currentUser)return;const btn=event.target;btn.disabled=true;btn.textContent="⏳...";try{await window.sb.from("profiles").upsert({id:window.currentUser.id,email:window.currentUser.email,full_name:document.getElementById("edit-fullname")?.value.trim(),phone:document.getElementById("edit-phone")?.value.trim(),avatar_url:document.getElementById("edit-avatar")?.value.trim()});window.closeProfileEdit();const pn=document.getElementById("profile-display-name");if(pn)pn.textContent=document.getElementById("edit-fullname")?.value.trim()||window.currentUser.email.split("@")[0];window.toast("✅ Сохранено","success");}catch(e){window.toast("❌ "+e.message,"error");}finally{btn.disabled=false;btn.textContent="Сохранить";}};
 
-// 10. REVIEWS, CHAT, PVZ
+// 10. REVIEWS, CHAT, PVZ, MODALS
 async function loadReviews(pid){const l=document.getElementById("reviews-list");if(!l)return;try{const res=await window.sb.from("reviews").select("*,profiles(full_name)").eq("product_id",pid).order("created_at",{ascending:false});const r=res.data;l.innerHTML=r?.length?r.map(x=>`<div class="review-card"><div style="display:flex;justify-content:space-between"><b>${x.profiles?.full_name||x.user_email.split("@")[0]}</b><span style="color:#f59e0b">${"⭐".repeat(x.rating)}</span></div><p style="margin-top:6px;color:var(--text-muted)">${x.comment}</p>${window.currentUser&&ADMIN_EMAILS.includes(window.currentUser.email)?`<button onclick="window.deleteReview('${x.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-top:6px;font-size:0.8rem">Удалить</button>`:''}</div>`).join(""):'<p style="color:var(--text-muted)">Нет отзывов</p>';}catch(e){console.error(e);}}
 document.getElementById("review-form")?.addEventListener("submit",async e=>{e.preventDefault();if(!window.currentUser)return window.toast("Войдите","error");const r=Number(document.getElementById("review-rating").value),c=document.getElementById("review-comment")?.value.trim();if(!c)return window.toast("Напишите текст","error");try{await window.sb.from("reviews").insert({product_id:window._cur.id,user_id:window.currentUser.id,user_email:window.currentUser.email,rating:r,comment:c});document.getElementById("review-comment").value="";await loadReviews(window._cur.id);window.toast("✅ Спасибо!","success");}catch(e){window.toast("❌ "+e.message,"error");}});
 window.deleteReview=async id=>{if(!confirm("Удалить?"))return;try{await window.sb.from("reviews").delete().eq("id",id);await loadReviews(window._cur.id);window.toast("🗑️","info");}catch(e){window.toast("❌ "+e.message,"error");}};
@@ -224,6 +204,15 @@ window.sendMsgDirect=t=>{document.getElementById("chat-in").value=t;window.sendM
 window.openPVZ=()=>{document.getElementById("pvz-modal").classList.add("open");document.getElementById("pvz-city").value=window.pvz.city||"";document.getElementById("pvz-addr").value=window.pvz.addr||"";};
 window.closePVZ=()=>document.getElementById("pvz-modal").classList.remove("open");
 window.savePVZ=()=>{const c=document.getElementById("pvz-city")?.value.trim(),a=document.getElementById("pvz-addr")?.value.trim();if(!c||!a)return window.toast("Заполните поля","error");window.pvz={city:c,addr:a};localStorage.setItem("pvz",JSON.stringify(window.pvz));window.closePVZ();window.toast("✅ Сохранено","success");};
+
+// LEGAL MODALS
+window.openModal = type => {
+  const m = document.getElementById("legal-modal"); const t = document.getElementById("legal-title"); const b = document.getElementById("legal-body");
+  m.classList.add("open");
+  if(type==="offer"){t.textContent="📜 Публичная оферта";b.innerHTML=`<div class="legal-text"><h3>1. Общие положения</h3><p>Оферта от Маслакова А.Е. (ИНН: 541500394308). Акцепт = оплата заказа.</p><h3>2. Возврат</h3><p>14 дней на возврат при сохранении вида. Возврат средств в течение 10 дней.</p><h3>3. Контакты</h3><p>📧 antoniobandero11@gmail.com | 📱 +7 (923) 682-60-48</p></div>`;}
+  else if(type==="privacy"){t.textContent="🔒 Конфиденциальность";b.innerHTML=`<div class="legal-text"><p>Мы собираем email, телефон, адрес для доставки. Данные хранятся в Supabase (TLS). Не передаются третьим лицам. Удаление по запросу.</p></div>`;}
+};
+window.closeModal = type => { document.getElementById(type==="legal"?"legal-modal":type+"-modal")?.classList.remove("open"); };
 document.getElementById("add-file")?.addEventListener("change",function(e){const f=e.target.files[0],p=document.getElementById("img-preview");if(f){p.src=URL.createObjectURL(f);p.style.display="block"}else{p.style.display="none"}});
 
 document.addEventListener("DOMContentLoaded",()=>{loadProds();updateCart();});
