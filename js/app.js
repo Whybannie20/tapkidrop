@@ -1,5 +1,5 @@
 // ==========================================
-// ТАПКИДРОП | ADMIN + CORE v6.0 (STABLE)
+// ТАПКИДРОП | STABLE CORE v6.2
 // ==========================================
 
 // 1. SUPABASE INIT
@@ -18,7 +18,7 @@ try {
 window.cart = JSON.parse(localStorage.getItem("cart")) || [];
 window.pvz = JSON.parse(localStorage.getItem("pvz")) || {city:"", addr:""};
 window.currentUser = null; window.userProfile = null;
-window._editProdId = null; // Для режима редактирования
+window._editProdId = null;
 let prods = [];
 const TG_TOKEN = "8706865987:AAHSTQvxklwoiScS3HpJvFyEyVT57eQkz8o", TG_CHAT = "-1003371505343";
 const ADMIN_EMAILS = ["antoniobandero11@gmail.com", "buldozer.mas12@gmail.com"];
@@ -29,12 +29,16 @@ window.toast = (msg, type="info") => {
   document.body.appendChild(t); setTimeout(()=>{t.style.opacity="0";setTimeout(()=>t.remove(),200);},2500);
 };
 
-// 3. NAV
-window.go = id => {
+// 3. NAV & UI CONTROL
+window.go = function(id) {
   document.querySelectorAll(".page").forEach(p=>{p.classList.remove("active");p.style.opacity="0";p.style.transform="translateY(8px)";});
   const el = document.getElementById(id); if(el){el.classList.add("active");requestAnimationFrame(()=>{el.style.opacity="1";el.style.transform="translateY(0)";});}
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.remove("active"));
   const nav = document.querySelector(`.nav-item[onclick*="${id}"]`); if(nav) nav.classList.add("active");
+  
+  // ✅ Скрываем категории только на нужных страницах
+  const catNav = document.getElementById("cat-nav"); if(catNav) catNav.classList.toggle("hide", id !== "home" && id !== "catalog");
+  
   window.scrollTo({top:0, behavior:"smooth"});
   if(id==="admin") loadAdmin(); if(id==="my-orders") loadOrders(); if(id==="product" && window._cur) loadReviews(window._cur.id);
 };
@@ -48,7 +52,7 @@ async function loadProds() {
     const res = await window.sb.from("products").select("*").order("created_at", {ascending:false});
     if(res.error) throw res.error;
     prods = res.data || []; render(prods.slice(0,4));
-  } catch(e) { window.toast("❌ Ошибка каталога","error"); }
+  } catch(e) { console.error("[LOAD]",e); }
 }
 
 function render(list) {
@@ -86,16 +90,21 @@ window.rmQ=k=>{window.cart.splice(k,1);localStorage.setItem("cart",JSON.stringif
 
 // 6. CHECKOUT
 window.checkout = async () => {
-  const btn=document.getElementById("checkout-btn"); if(!btn) return;
+  const btn = document.getElementById("checkout-btn"); if (!btn) return;
   try {
-    const res=await window.sb.auth.getUser(); if(res.error) throw res.error; const user=res.data?.user;
-    if(!user) return window.toast("Войдите","error"); if(!window.cart.length) return window.toast("Корзина пуста","error");
+    const agree = document.getElementById("agree-check");
+    if (!agree?.checked) return window.toast("Примите условия оферты и политики", "error");
+    
+    const res = await window.sb.auth.getUser(); if(res.error) throw res.error;
+    const user = res.data?.user; if(!user) return window.toast("Войдите","error");
+    if(!window.cart.length) return window.toast("Корзина пуста","error");
     if(!window.pvz.city||!window.pvz.addr){window.openPVZ();return window.toast("Укажите адрес","error");}
     btn.disabled=true; btn.textContent="⏳ Оформление...";
+    
     const total=window.cart.reduce((s,i)=>s+Number(i.price)*(i.qty||1),0); const items=window.cart.map(i=>`${i.name}${i.size?` (${i.size})`:''} ×${i.qty}`).join(", ");
-    const or=await window.sb.from("orders").insert({user_email:user.email,items,total:total.toLocaleString("ru")+" ₽",address:`${window.pvz.city}, ${window.pvz.addr}`,status:"new"}).select().single();
+    const or=await window.sb.from("orders").insert({user_email:user.email,items,total:total.toLocaleString("ru")+" ₽",address:`${window.pvz.city}, ${window.pvz.addr}`,status:"pending"}).select().single();
     if(or.error) throw or.error;
-    fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:TG_CHAT,text:`📦 ЗАКАЗ\n👤 ${or.data.user_email}\n🛍️ ${or.data.items}\n💰 ${or.data.total}\n📍 ${or.data.address}`})}).catch(()=>{});
+    fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:TG_CHAT,text:`📦 ЗАКАЗ #${or.data.id.slice(0,6)}\n👤 ${or.data.user_email}\n🛍️ ${or.data.items}\n💰 ${or.data.total}`})}).catch(()=>{});
     window.cart=[]; localStorage.setItem("cart","[]"); updateCart(); window.toast("✅ Оформлен!","success"); setTimeout(()=>window.go("my-orders"),600);
   } catch(e){console.error(e);window.toast("❌ "+e.message,"error");} finally{btn.disabled=false;btn.textContent="Оформить";}
 };
@@ -107,37 +116,33 @@ window.loadOrders = async () => {
     const res=await window.sb.auth.getUser(); const user=res.data?.user; if(!user){c.innerHTML='<p style="text-align:center;padding:30px;color:var(--text-muted)">Войдите</p>';return;}
     c.innerHTML='<div style="text-align:center;padding:20px">Загрузка...</div>';
     const or=await window.sb.from("orders").select("*").eq("user_email",user.email).order("created_at",{ascending:false}); if(or.error) throw or.error;
-    const steps=["new","processing","shipped","delivered"], labels={new:"Новый",processing:"Собирается",shipped:"В пути",delivered:"Доставлен"};
+    const steps=["pending","paid","processing","shipped","delivered"], labels={pending:"Ожидает оплаты",paid:"Оплачен",processing:"Собирается",shipped:"В пути",delivered:"Доставлен"};
     c.innerHTML=or.data?.length?or.data.map(o=>{const idx=steps.indexOf(o.status);return `<div class="cart-item" style="display:block"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><b>#${(o.id||"").slice(0,8)}</b><span>${o.total}</span></div><div style="color:var(--text-muted);margin-bottom:8px;font-size:0.9rem">${o.items}</div><div class="status-bar">${steps.map((_,i)=>`<div class="step ${i<=idx?'active':''}"></div>`).join("")}</div><div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.8rem;color:var(--text-muted)"><span>${labels[o.status]||o.status}</span><small>${new Date(o.created_at).toLocaleDateString("ru")}</small></div></div>`}).join(""):'<p style="text-align:center;padding:30px;color:var(--text-muted)">Нет заказов</p>';
   } catch(e){c.innerHTML='<p style="text-align:center;padding:30px;color:var(--danger)">Ошибка</p>';}
 };
 
-// 8. 🔧 ADMIN (РАСШИРЕННАЯ СТАТИСТИКА + РЕДАКТИРОВАНИЕ + ФОТО)
+// 8. ADMIN
 async function loadAdmin() {
   try {
-    // Статистика
     const {count:ordCnt}=await window.sb.from("orders").select("*",{count:"exact",head:true});
     const {count:prodCnt}=await window.sb.from("products").select("*",{count:"exact",head:true});
     const {count:revCnt}=await window.sb.from("reviews").select("*",{count:"exact",head:true});
     const {data:ordData}=await window.sb.from("orders").select("total");
     const rev=ordData?.reduce((s,o)=>s+(parseFloat(String(o.total).replace(/[^0-9.]/g,""))||0),0)||0;
     
-    document.getElementById("st-orders").textContent=ordCnt||0;
-    document.getElementById("st-prods").textContent=prodCnt||0;
-    document.getElementById("st-reviews").textContent=revCnt||0;
-    document.getElementById("st-rev").textContent=rev.toLocaleString("ru")+" ₽";
+    const elOrd=document.getElementById("st-orders"); if(elOrd) elOrd.textContent=ordCnt||0;
+    const elProd=document.getElementById("st-prods"); if(elProd) elProd.textContent=prodCnt||0;
+    const elRev=document.getElementById("st-reviews"); if(elRev) elRev.textContent=revCnt||0;
+    const elRevSum=document.getElementById("st-rev"); if(elRevSum) elRevSum.textContent=rev.toLocaleString("ru")+" ₽";
 
-    // Заказы (админ)
     const {data:allOrders}=await window.sb.from("orders").select("*").order("created_at",{ascending:false}).limit(50);
-    const statuses=["new","processing","shipped","delivered","cancelled"];
-    document.getElementById("admin-orders-list").innerHTML=allOrders?.map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><span>#${(o.id||"").slice(0,6)}<br><small style="color:var(--text-muted)">${o.user_email}</small></span><select onchange="window.updateOrderStatus('${o.id}',this.value)" class="input" style="width:auto">${statuses.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join("")}</select><button onclick="window.deleteOrder('${o.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div>`).join("")||'<p style="color:var(--text-muted)">Нет заказов</p>';
+    const statuses=["pending","paid","processing","shipped","delivered","cancelled"];
+    const ol=document.getElementById("admin-orders-list"); if(ol) ol.innerHTML=allOrders?.map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><span>#${(o.id||"").slice(0,6)}<br><small style="color:var(--text-muted)">${o.user_email}</small></span><select onchange="window.updateOrderStatus('${o.id}',this.value)" class="input" style="width:auto">${statuses.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join("")}</select><button onclick="window.deleteOrder('${o.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div>`).join("")||'<p style="color:var(--text-muted)">Нет заказов</p>';
 
-    // Товары (админ) с кнопкой редактирования
-    document.getElementById("admin-prods").innerHTML=prods.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;overflow:hidden"><img src="${p.image_url||''}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px">${p.name}</span></div><div style="display:flex;gap:6px"><button onclick="window.editProd('${p.id}')" style="background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.8rem">✏️</button><button onclick="window.delProd('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div></div>`).join("")||'<p style="color:var(--text-muted)">Нет товаров</p>';
+    const ap=document.getElementById("admin-prods"); if(ap) ap.innerHTML=prods.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;overflow:hidden"><img src="${p.image_url||''}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px">${p.name}</span></div><div style="display:flex;gap:6px"><button onclick="window.editProd('${p.id}')" style="background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.8rem">✏️</button><button onclick="window.delProd('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger)">🗑</button></div></div>`).join("")||'<p style="color:var(--text-muted)">Нет товаров</p>';
   } catch(e){console.error("[ADMIN]",e);}
 }
 
-// Загрузка товара в форму для редактирования
 window.editProd = id => {
   const p = prods.find(x=>x.id===id); if(!p) return;
   window._editProdId = id;
@@ -164,76 +169,61 @@ window.cancelEdit = () => {
   document.getElementById("prod-action-btn").textContent="💾 Опубликовать";
   document.getElementById("prod-cancel-btn").style.display="none";
 };
-
-// Обработка формы (создание ИЛИ обновление)
 window.handleProdAction = async () => {
-  const n=document.getElementById("add-name").value.trim(), p=Number(document.getElementById("add-price").value), c=document.getElementById("add-cat").value, s=document.getElementById("add-sizes").value, u=document.getElementById("add-img").value.trim(), d=document.getElementById("add-desc").value.trim(), f=document.getElementById("add-file")?.files?.[0];
+  const n=document.getElementById("add-name")?.value.trim(), p=Number(document.getElementById("add-price")?.value), c=document.getElementById("add-cat")?.value, s=document.getElementById("add-sizes")?.value, u=document.getElementById("add-img")?.value.trim(), d=document.getElementById("add-desc")?.value.trim(), f=document.getElementById("add-file")?.files?.[0];
   if(!n||!p) return window.toast("Заполните название и цену","error");
   const btn=document.getElementById("prod-action-btn"); btn.disabled=true; btn.textContent="⏳...";
-  
   try {
     let url=u;
-    if(f){
-      if(!f.type.startsWith("image/")||f.size>5*1024*1024) throw new Error("Только изображения до 5МБ");
-      const fn=`${Date.now()}_${f.name.replace(/[^a-z0-9.]/gi,"_")}`;
-      await window.sb.storage.from("products").upload(fn,f,{upsert:true});
-      // ✅ ИСПРАВЛЕНИЕ: Правильное получение публичного URL
-      const {data} = window.sb.storage.from("products").getPublicUrl(fn);
-      url = data?.publicUrl || "";
-    }
-    
-    const payload = {name:n,price:p,category:c,sizes:s.split(",").map(x=>x.trim()).filter(Boolean),image_url:url,description:d};
-    if(window._editProdId) {
-      // Обновление существующего
-      const {error}=await window.sb.from("products").update(payload).eq("id",window._editProdId);
-      if(error) throw error;
-      window.toast("✅ Товар обновлён","success");
-    } else {
-      // Создание нового
-      const {error}=await window.sb.from("products").insert(payload);
-      if(error) throw error;
-      window.toast("✅ Товар опубликован","success");
-    }
-    
-    window.cancelEdit(); await loadProds(); await loadAdmin();
+    if(f){const fn=`${Date.now()}_${f.name.replace(/[^a-z0-9.]/gi,"_")}`;await window.sb.storage.from("products").upload(fn,f,{upsert:true});const{data}=window.sb.storage.from("products").getPublicUrl(fn);url=data?.publicUrl||"";}
+    const payload={name:n,price:p,category:c,sizes:s.split(",").map(x=>x.trim()).filter(Boolean),image_url:url,description:d};
+    if(window._editProdId) { const{error}=await window.sb.from("products").update(payload).eq("id",window._editProdId); if(error) throw error; }
+    else { const{error}=await window.sb.from("products").insert(payload); if(error) throw error; }
+    window.toast("✅ "+(window._editProdId?"Обновлено":"Опубликовано"),"success"); window.cancelEdit(); await loadProds(); await loadAdmin();
   } catch(e){window.toast("❌ "+e.message,"error");} finally{btn.disabled=false;btn.textContent=window._editProdId?"Сохранить изменения":"Опубликовать";}
 };
+window.delProd=async id=>{if(!confirm("Удалить?"))return;try{await window.sb.from("products").delete().eq("id",id);window.toast("🗑️","info");await loadProds();await loadAdmin();}catch(e){window.toast("❌ "+e.message,"error");}};
+window.updateOrderStatus=async(oid,st)=>{try{await window.sb.from("orders").update({status:st}).eq("id",oid);await window.sb.from("order_status_history").insert({order_id:oid,status:st});window.toast("✅ Статус обновлён","success");await loadAdmin();await loadOrders();}catch(e){window.toast("❌ "+e.message,"error");}};
+window.deleteOrder=async id=>{if(!confirm("Удалить?"))return;try{await window.sb.from("orders").delete().eq("id",id);window.toast("🗑️ Заказ удалён","info");await loadAdmin();}catch(e){window.toast("❌ "+e.message,"error");}};
 
-window.delProd = async id => { if(!confirm("Удалить товар?"))return; try{await window.sb.from("products").delete().eq("id",id);window.toast("🗑️","info");await loadProds();await loadAdmin();}catch(e){window.toast("❌ "+e.message,"error");} };
-window.updateOrderStatus = async (oid,st) => { try{await window.sb.from("orders").update({status:st}).eq("id",oid);await window.sb.from("order_status_history").insert({order_id:oid,status:st,changed_by:window.currentUser?.id});window.toast("✅ Статус обновлён","success");await loadAdmin();await loadOrders();}catch(e){window.toast("❌ "+e.message,"error");} };
-window.deleteOrder = async id => { if(!confirm("Удалить заказ?"))return; try{await window.sb.from("orders").delete().eq("id",id);window.toast("🗑️ Заказ удалён","info");await loadAdmin();}catch(e){window.toast("❌ "+e.message,"error");} };
-
-// 9. AUTH & PROFILE
+// 9. AUTH & PROFILE (STABLE)
 let isLogin=true;
 document.querySelectorAll(".tab").forEach(t=>{t.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");isLogin=(t.dataset.tab==="login");const btn=document.getElementById("auth-btn");if(btn)btn.textContent=isLogin?"Войти":"Регистрация";};});
 document.getElementById("auth-form")?.addEventListener("submit",async e=>{
-  e.preventDefault(); const em=document.getElementById("email-in").value.trim(), pw=document.getElementById("pass-in").value, err=document.getElementById("auth-err"), btn=document.getElementById("auth-btn");
+  e.preventDefault(); const em=document.getElementById("email-in")?.value.trim(), pw=document.getElementById("pass-in")?.value, err=document.getElementById("auth-err"), btn=document.getElementById("auth-btn");
   if(!err||!btn) return; if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return err.textContent="Неверный email",err.style.display="block"; if(pw.length<6) return err.textContent="Пароль < 6 символов",err.style.display="block";
   err.style.display="none"; btn.disabled=true; btn.textContent="⏳...";
   try{const res=isLogin?await window.sb.auth.signInWithPassword({email:em,password:pw}):await window.sb.auth.signUp({email:em,password:pw});if(res.error)throw res.error;if(res.data?.user){await loadUserProfile(res.data.user);window.toast(isLogin?"✅ С возвращением!":"✅ Регистрация!","success");}}catch(e){err.textContent=e.message;err.style.display="block";window.toast("❌ "+err.textContent,"error");}finally{btn.disabled=false;btn.textContent=isLogin?"Войти":"Регистрация";}
 });
-window.sb.auth.onAuthStateChange(async function(_,session){const user=session?.user;window.currentUser=user||null;const af=document.getElementById("auth-flow"),pa=document.getElementById("profile-acts"),pn=document.getElementById("profile-display-name"),pe=document.getElementById("profile-email"),am=document.getElementById("admin-menu");if(af)af.style.display=user?"none":"block";if(pa)pa.style.display=user?"block":"none";if(user){await loadUserProfile(user);const n=window.userProfile?.full_name||user.email.split("@")[0];if(pn)pn.textContent=n;if(pe)pe.textContent=user.email;if(am)am.style.display=ADMIN_EMAILS.includes(user.email)?"flex":"none";}else{window.userProfile=null;if(pn)pn.textContent="Гость";if(pe)pe.textContent="Войдите";if(am)am.style.display="none";}});
+window.sb.auth.onAuthStateChange(async function(_,session){
+  const user=session?.user; window.currentUser=user||null;
+  const af=document.getElementById("auth-flow"),pa=document.getElementById("profile-acts"),pn=document.getElementById("profile-display-name"),pe=document.getElementById("profile-email"),am=document.getElementById("admin-menu");
+  if(af) af.style.display=user?"none":"block";
+  if(pa) pa.style.display=user?"block":"none";
+  if(user){await loadUserProfile(user);const n=window.userProfile?.full_name||user.email.split("@")[0];if(pn)pn.textContent=n;if(pe)pe.textContent=user.email;if(am)am.style.display=ADMIN_EMAILS.includes(user.email)?"flex":"none";}
+  else{window.userProfile=null;if(pn)pn.textContent="Гость";if(pe)pe.textContent="Войдите";if(am)am.style.display="none";}
+});
 async function loadUserProfile(user){if(!user?.id)return;try{const res=await window.sb.from("profiles").select("*").eq("id",user.id).single();if(res.error&&res.error.code!=="PGRST116")throw res.error;window.userProfile=res.data||{email:user.email,full_name:user.email.split("@")[0]};}catch(e){window.userProfile={email:user.email,full_name:user.email.split("@")[0]};}}
 document.getElementById("logout-btn")?.addEventListener("click",async function(){await window.sb.auth.signOut();window.currentUser=null;window.userProfile=null;window.toast("👋 Вышли","info");});
-window.editProfile=async function(){if(!window.currentUser)return window.toast("Войдите","error");await loadUserProfile(window.currentUser);document.getElementById("edit-fullname").value=window.userProfile?.full_name||"";document.getElementById("edit-phone").value=window.userProfile?.phone||"";document.getElementById("edit-avatar").value=window.userProfile?.avatar_url||"";document.getElementById("profile-edit-modal").classList.add("open");};
+window.editProfile=async function(){if(!window.currentUser)return window.toast("Войдите","error");await loadUserProfile(window.currentUser);const ef=document.getElementById("edit-fullname"),ep=document.getElementById("edit-phone"),ea=document.getElementById("edit-avatar");if(ef)ef.value=window.userProfile?.full_name||"";if(ep)ep.value=window.userProfile?.phone||"";if(ea)ea.value=window.userProfile?.avatar_url||"";document.getElementById("profile-edit-modal").classList.add("open");};
 window.closeProfileEdit=()=>document.getElementById("profile-edit-modal").classList.remove("open");
-window.saveProfile=async function(){if(!window.currentUser)return;const btn=event.target;btn.disabled=true;btn.textContent="⏳...";try{await window.sb.from("profiles").upsert({id:window.currentUser.id,email:window.currentUser.email,full_name:document.getElementById("edit-fullname").value.trim(),phone:document.getElementById("edit-phone").value.trim(),avatar_url:document.getElementById("edit-avatar").value.trim()});window.closeProfileEdit();document.getElementById("profile-display-name").textContent=document.getElementById("edit-fullname").value.trim()||window.currentUser.email.split("@")[0];window.toast("✅ Сохранено","success");}catch(e){window.toast("❌ "+e.message,"error");}finally{btn.disabled=false;btn.textContent="Сохранить";}};
+window.saveProfile=async function(){if(!window.currentUser)return;const btn=event.target;btn.disabled=true;btn.textContent="⏳...";try{await window.sb.from("profiles").upsert({id:window.currentUser.id,email:window.currentUser.email,full_name:document.getElementById("edit-fullname")?.value.trim(),phone:document.getElementById("edit-phone")?.value.trim(),avatar_url:document.getElementById("edit-avatar")?.value.trim()});window.closeProfileEdit();const pn=document.getElementById("profile-display-name");if(pn)pn.textContent=document.getElementById("edit-fullname")?.value.trim()||window.currentUser.email.split("@")[0];window.toast("✅ Сохранено","success");}catch(e){window.toast("❌ "+e.message,"error");}finally{btn.disabled=false;btn.textContent="Сохранить";}};
 
 // 10. REVIEWS, CHAT, PVZ
 async function loadReviews(pid){const l=document.getElementById("reviews-list");if(!l)return;try{const res=await window.sb.from("reviews").select("*,profiles(full_name)").eq("product_id",pid).order("created_at",{ascending:false});const r=res.data;l.innerHTML=r?.length?r.map(x=>`<div class="review-card"><div style="display:flex;justify-content:space-between"><b>${x.profiles?.full_name||x.user_email.split("@")[0]}</b><span style="color:#f59e0b">${"⭐".repeat(x.rating)}</span></div><p style="margin-top:6px;color:var(--text-muted)">${x.comment}</p>${window.currentUser&&ADMIN_EMAILS.includes(window.currentUser.email)?`<button onclick="window.deleteReview('${x.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-top:6px;font-size:0.8rem">Удалить</button>`:''}</div>`).join(""):'<p style="color:var(--text-muted)">Нет отзывов</p>';}catch(e){console.error(e);}}
-document.getElementById("review-form")?.addEventListener("submit",async e=>{e.preventDefault();if(!window.currentUser)return window.toast("Войдите","error");const r=Number(document.getElementById("review-rating").value),c=document.getElementById("review-comment").value.trim();if(!c)return window.toast("Напишите текст","error");try{await window.sb.from("reviews").insert({product_id:window._cur.id,user_id:window.currentUser.id,user_email:window.currentUser.email,rating:r,comment:c});document.getElementById("review-comment").value="";await loadReviews(window._cur.id);window.toast("✅ Спасибо!","success");}catch(e){window.toast("❌ "+e.message,"error");}});
+document.getElementById("review-form")?.addEventListener("submit",async e=>{e.preventDefault();if(!window.currentUser)return window.toast("Войдите","error");const r=Number(document.getElementById("review-rating").value),c=document.getElementById("review-comment")?.value.trim();if(!c)return window.toast("Напишите текст","error");try{await window.sb.from("reviews").insert({product_id:window._cur.id,user_id:window.currentUser.id,user_email:window.currentUser.email,rating:r,comment:c});document.getElementById("review-comment").value="";await loadReviews(window._cur.id);window.toast("✅ Спасибо!","success");}catch(e){window.toast("❌ "+e.message,"error");}});
 window.deleteReview=async id=>{if(!confirm("Удалить?"))return;try{await window.sb.from("reviews").delete().eq("id",id);await loadReviews(window._cur.id);window.toast("🗑️","info");}catch(e){window.toast("❌ "+e.message,"error");}};
 
 window.openChat=()=>{document.getElementById("chat-modal").classList.add("open");document.getElementById("chat-body").innerHTML='<div id="quick-q" style="display:flex;flex-direction:column;gap:8px"><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Возврат\')">↩️ Возврат</button><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Где заказ\')">📦 Статус</button><button class="quick-q-btn" onclick="window.sendMsgDirect(\'Оператор\')">👨‍💻 Оператор</button></div>';addMsg("👋 Привет! Выберите вопрос.");};
 window.closeChat=()=>document.getElementById("chat-modal").classList.remove("open");
 const BOT_ANSWERS={"возврат":"↩️ 14 дней, товар в упаковке. Оформите в заказах.","где заказ":"📦 Статус в разделе Мои заказы.","оператор":"👨‍💻 Подключим за 5 мин. Оставьте вопрос."};
 function addMsg(t){const b=document.getElementById("chat-body");b.innerHTML+=`<div style="background:var(--bg);padding:10px 12px;border-radius:12px;align-self:flex-start;max-width:80%">${t}</div>`;b.scrollTop=b.scrollHeight;}
-window.sendMsg=()=>{const i=document.getElementById("chat-in"),t=i.value.trim();if(!t)return;const q=document.getElementById("quick-q");if(q)q.remove();const b=document.getElementById("chat-body");b.innerHTML+=`<div style="background:var(--accent);color:#fff;padding:10px 12px;border-radius:12px;align-self:end;max-width:80%">${t}</div>`;i.value="";b.scrollTop=b.scrollHeight;setTimeout(()=>{const k=Object.keys(BOT_ANSWERS).find(x=>t.toLowerCase().includes(x));addMsg(k?BOT_ANSWERS[k]:"🤖 Передал оператору.");},600);};
+window.sendMsg=()=>{const i=document.getElementById("chat-in"),t=i?.value.trim();if(!t)return;const q=document.getElementById("quick-q");if(q)q.remove();const b=document.getElementById("chat-body");b.innerHTML+=`<div style="background:var(--accent);color:#fff;padding:10px 12px;border-radius:12px;align-self:end;max-width:80%">${t}</div>`;i.value="";b.scrollTop=b.scrollHeight;setTimeout(()=>{const k=Object.keys(BOT_ANSWERS).find(x=>t.toLowerCase().includes(x));addMsg(k?BOT_ANSWERS[k]:"🤖 Передал оператору.");},600);};
 window.sendMsgDirect=t=>{document.getElementById("chat-in").value=t;window.sendMsg();};
 
 window.openPVZ=()=>{document.getElementById("pvz-modal").classList.add("open");document.getElementById("pvz-city").value=window.pvz.city||"";document.getElementById("pvz-addr").value=window.pvz.addr||"";};
 window.closePVZ=()=>document.getElementById("pvz-modal").classList.remove("open");
-window.savePVZ=()=>{const c=document.getElementById("pvz-city").value.trim(),a=document.getElementById("pvz-addr").value.trim();if(!c||!a)return window.toast("Заполните поля","error");window.pvz={city:c,addr:a};localStorage.setItem("pvz",JSON.stringify(window.pvz));window.closePVZ();window.toast("✅ Сохранено","success");};
+window.savePVZ=()=>{const c=document.getElementById("pvz-city")?.value.trim(),a=document.getElementById("pvz-addr")?.value.trim();if(!c||!a)return window.toast("Заполните поля","error");window.pvz={city:c,addr:a};localStorage.setItem("pvz",JSON.stringify(window.pvz));window.closePVZ();window.toast("✅ Сохранено","success");};
 document.getElementById("add-file")?.addEventListener("change",function(e){const f=e.target.files[0],p=document.getElementById("img-preview");if(f){p.src=URL.createObjectURL(f);p.style.display="block"}else{p.style.display="none"}});
 
 document.addEventListener("DOMContentLoaded",()=>{loadProds();updateCart();});

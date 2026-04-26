@@ -335,3 +335,16 @@ h1 { font-size: clamp(1.5rem, 3.5vw, 2.2rem); font-weight: 800; line-height: 1.1
   .grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+/* 🛠 FIX: PROFILE LAYOUT & NAV VISIBILITY */
+#cat-nav { display: block; }
+#cat-nav.hide { display: none; }
+
+.profile-header { padding-bottom: 20px; }
+.menu-grid { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.menu-item { margin: 0 !important; align-items: center; }
+#auth-flow { margin-top: 24px; width: 100%; }
+#profile-acts { margin-top: 20px; width: 100%; }
+
+/* Предотвращаем наложение при скролле/анимации */
+.page { position: relative; z-index: 1; }
+.app-main { position: relative; min-height: 60vh; }
