@@ -1,0 +1,97 @@
+cat > index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ТапкиДроп | Маркетплейс кроссовок</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header__inner">
+      <a href="/" class="logo">ТАПКИ<span>ДРОП</span></a>
+      <nav class="nav">
+        <a href="#catalog" class="nav__link">Каталог</a>
+        <a href="#photo-search" class="nav__link nav__link--accent"><i class="fa-solid fa-camera"></i> Поиск по фото</a>
+      </nav>
+      <div class="header__actions">
+        <button id="cart-btn" class="btn-icon"><i class="fa-solid fa-bag-shopping"></i> <span id="cart-count">0</span></button>
+        <button id="auth-btn" class="btn btn--outline">Войти</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="container hero__inner">
+        <div class="hero__content">
+          <h1 class="hero__title">Лови дроп. Стиль без переплат.</h1>
+          <p class="hero__subtitle">Качественные пары и локальные бренды. Загрузи фото — мы найдём подходящее.</p>
+          <div class="hero__actions">
+            <a href="#photo-search" class="btn btn--primary">Найти по фото</a>
+            <a href="#catalog" class="btn btn--secondary">Смотреть каталог</a>
+          </div>
+        </div>
+        <div class="hero__visual">
+          <div class="placeholder-box">👟 ТапкиДроп</div>
+        </div>
+      </div>
+    </section>
+    <section id="photo-search" class="section search-section">
+      <div class="container">
+        <h2 class="section__title">Поиск по фотографии</h2>
+        <p class="section__subtitle">Загрузи скриншот или фото. Алгоритм подберёт похожие модели из каталога.</p>
+        <div class="upload-zone" id="upload-zone">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>Перетащи фото сюда или <span class="upload-trigger">нажми для выбора</span></p>
+          <input type="file" id="file-input" accept="image/*" hidden>
+          <div class="upload-preview" id="upload-preview"></div>
+        </div>
+        <button id="search-btn" class="btn btn--primary" disabled>Найти похожие</button>
+        <div id="search-results" class="results-grid"></div>
+      </div>
+    </section>
+    <section id="catalog" class="section category-section">
+      <div class="container">
+        <div class="category-header">
+          <h2 class="section__title">🔥 Каталог</h2>
+        </div>
+        <div class="products-grid" id="catalog-grid"></div>
+      </div>
+    </section>
+    <section class="section trust-section">
+      <div class="container">
+        <div class="trust-grid">
+          <div class="trust-card"><i class="fa-solid fa-magnifying-glass-check"></i><h3>Контроль качества</h3><p>Проверка каждой пары перед отправкой</p></div>
+          <div class="trust-card"><i class="fa-solid fa-truck-fast"></i><h3>Быстрая доставка</h3><p>Отправка в день оплаты</p></div>
+          <div class="trust-card"><i class="fa-solid fa-rotate-left"></i><h3>Гарантия возврата</h3><p>14 дней на обмен или возврат</p></div>
+          <div class="trust-card"><i class="fa-solid fa-lock"></i><h3>Безопасные платежи</h3><p>Холдирование до получения</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__col">
+        <a href="/" class="logo">ТАПКИ<span>ДРОП</span></a>
+        <p>Маркетплейс стильных кроссовок.</p>
+      </div>
+      <div class="footer__col">
+        <h4>Покупателям</h4><a href="#">Как заказать</a><a href="#">Доставка</a><a href="#">Возврат</a>
+      </div>
+      <div class="footer__col">
+        <h4>Продавцам</h4><a href="#">Стать партнёром</a><a href="#">Тарифы</a><a href="#">Правила</a>
+      </div>
+      <div class="footer__col">
+        <h4>Юридическое</h4><a href="#">Соглашение</a><a href="#">Конфиденциальность</a><a href="#">Оферта</a>
+      </div>
+    </div>
+    <div class="container footer__bottom">
+      <p>&copy; <span id="year"></span> ТапкиДроп. Все права защищены.</p>
+    </div>
+  </footer>
+  <script src="js/main.js"></script>
+</body>
+</html>
+EOF

@@ -1,0 +1,9 @@
+cat > netlify.toml << 'EOF'
+[build]
+  publish = "."
+  command = "echo 'Ready'"
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+EOF
